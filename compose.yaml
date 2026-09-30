@@ -1,0 +1,20 @@
+name: xlab-vigil
+services:
+  database:
+    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
+    environment:
+      POSTGRES_DB: vigil
+      POSTGRES_USER: vigil
+      POSTGRES_PASSWORD: ${VIGIL_DB_PASSWORD:?Run scripts/setup.ps1}
+    ports:
+      - "127.0.0.1:55440:5432"
+    volumes:
+      - vigil-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigil -d vigil"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+volumes:
+  vigil-data:

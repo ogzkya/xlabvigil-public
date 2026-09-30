@@ -1,0 +1,9 @@
+{
+  "folders": [{ "name": "XLab Vigil — kurumsal risk izleme", "path": "." }],
+  "settings": {
+    "files.exclude": { "**/node_modules": true, "**/dist": true },
+    "search.exclude": { "**/runtime": true },
+    "editor.formatOnSave": true,
+    "window.title": "XLab Vigil — ${activeEditorShort}"
+  }
+}
