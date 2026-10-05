@@ -1,17 +1,9 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
-if (-not (Test-Path -LiteralPath '.env')) {
-    $bytes = New-Object byte[] 32
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    $databasePassword = [Convert]::ToHexString($bytes).ToLowerInvariant()
-    Set-Content -LiteralPath '.env' -Value "VIGIL_DB_PASSWORD=$databasePassword" -Encoding utf8
-    $account = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    & icacls.exe (Join-Path $projectRoot '.env') /inheritance:r /grant:r "${account}:(F)" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Yerel ayar dosyasının izinleri kısıtlanamadı.' }
-}
-docker compose up -d --wait
-if ($LASTEXITCODE -ne 0) { throw 'Veritabanı başlatılamadı.' }
+. (Join-Path $PSScriptRoot 'common.ps1')
+foreach ($command in @('docker', 'go', 'node', 'npm.cmd')) { Assert-VigilCommand $command }
+Assert-VigilStopped
 Push-Location web
 try {
     npm.cmd ci
@@ -20,6 +12,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Arayüz derlenemedi.' }
 } finally { Pop-Location }
 New-Item -ItemType Directory -Path runtime -Force | Out-Null
-go build -o runtime/vigil.exe ./cmd/vigil
+go build -trimpath -o runtime/vigil.exe ./cmd/vigil
 if ($LASTEXITCODE -ne 0) { throw 'Uygulama derlenemedi.' }
-Write-Output 'XLab Vigil hazır. Başlatmak için scripts/start.ps1 çalıştırın.'
+go build -trimpath -o runtime/vigil-backup.exe ./cmd/vigil-backup
+if ($LASTEXITCODE -ne 0) { throw 'Yedek şifreleme aracı derlenemedi.' }
+& (Join-Path $PSScriptRoot 'install.ps1')

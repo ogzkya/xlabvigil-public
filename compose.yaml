@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: vigil
       POSTGRES_PASSWORD: ${VIGIL_DB_PASSWORD:?Run scripts/setup.ps1}
     ports:
-      - "127.0.0.1:55440:5432"
+      - "127.0.0.1:${VIGIL_DB_PORT:-55440}:5432"
     volumes:
       - vigil-data:/var/lib/postgresql
     healthcheck:
