@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,42 +19,71 @@ import (
 )
 
 func main() {
-	addr := os.Getenv("VIGIL_ADDR")
-	if addr == "" {
-		addr = "127.0.0.1:8320"
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
-	if addr != "127.0.0.1:8320" && addr != "127.0.0.1:8321" {
-		log.Fatal("Bu geliştirme sürümü yalnızca ayrılmış yerel adreslerde çalışır.")
+}
+
+var errListenAddress = errors.New("VIGIL_ADDR yalnızca 127.0.0.1 üzerinde 1024–65535 arası bir port olabilir.")
+
+func loopbackAddress(value string) (string, error) {
+	if value == "" {
+		return "127.0.0.1:8320", nil
+	}
+	const prefix = "127.0.0.1:"
+	if !strings.HasPrefix(value, prefix) {
+		return "", errListenAddress
+	}
+	portText := value[len(prefix):]
+	if len(portText) == 0 || len(portText) > 5 || portText[0] == '0' {
+		return "", errListenAddress
+	}
+	for _, digit := range portText {
+		if digit < '0' || digit > '9' {
+			return "", errListenAddress
+		}
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1024 || port > 65535 {
+		return "", errListenAddress
+	}
+	return value, nil
+}
+
+func run() error {
+	addr, err := loopbackAddress(os.Getenv("VIGIL_ADDR"))
+	if err != nil {
+		return err
+	}
+	webRoot := filepath.Join("web", "dist")
+	if err := requireWebBuild(webRoot); err != nil {
+		return errors.New("Ön yüz derlemesi eksik veya okunamıyor. web dizininde npm run build çalıştırın.")
 	}
 	dsn := os.Getenv("VIGIL_DATABASE_URL")
 	if dsn == "" {
-		log.Fatal("Veritabanı ayarı eksik. scripts/start.ps1 kullanın.")
+		return errors.New("Veritabanı ayarı eksik. scripts/start.ps1 kullanın.")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		log.Fatal("Veritabanı ayarı okunamadı.")
+		return errors.New("Veritabanı ayarı okunamadı.")
 	}
 	defer pool.Close()
 	if err = pool.Ping(ctx); err != nil {
-		log.Fatal("Veritabanına ulaşılamadı.")
+		return errors.New("Veritabanına ulaşılamadı.")
 	}
-	application := app.New(pool, "http://"+addr, "web/dist")
+	application := app.New(pool, "http://"+addr, webRoot)
 	if err = application.Migrate(ctx); err != nil {
-		log.Fatal("Veritabanı hazırlanamadı.")
+		return errors.New("Veritabanı hazırlanamadı.")
 	}
 	srv := &http.Server{Addr: addr, Handler: application.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-stop
-		shutdown, done := context.WithTimeout(context.Background(), 5*time.Second)
-		defer done()
-		_ = srv.Shutdown(shutdown)
-	}()
-	log.Printf("XLab Vigil hazır: http://%s (yerel geliştirme)", addr)
-	if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal("Uygulama başlatılamadı; port kullanımını kontrol edin.")
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return errors.New("Uygulama başlatılamadı; port kullanımını kontrol edin.")
 	}
+	runContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	log.Printf("XLab Vigil hazır: http://%s (yerel geliştirme)", addr)
+	return serveHTTP(runContext, srv, listener)
 }

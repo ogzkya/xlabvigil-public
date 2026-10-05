@@ -14,6 +14,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -60,7 +61,12 @@ var membershipActivitySchema string
 //go:embed schema_011.sql
 var membershipReviewSchema string
 
-var migrations = []string{schema, integrationSchema, notificationSchema, userManagementSchema, eventSearchSchema, notificationSearchSchema, auditSearchSchema, candidateEventSchema, membershipEvidenceSchema, membershipActivitySchema, membershipReviewSchema}
+//go:embed schema_012.sql
+var investigationCaseSchema string
+
+var migrations = []string{schema, integrationSchema, notificationSchema, userManagementSchema, eventSearchSchema, notificationSearchSchema, auditSearchSchema, candidateEventSchema, membershipEvidenceSchema, membershipActivitySchema, membershipReviewSchema, investigationCaseSchema}
+
+const productVersion = "1.4.0"
 
 type App struct {
 	DB              *pgxpool.Pool
@@ -151,6 +157,10 @@ func (a *App) Handler() http.Handler {
 	m.Handle("POST /api/logout", a.auth(http.HandlerFunc(a.logout)))
 	m.Handle("POST /api/session/password", a.auth(http.HandlerFunc(a.changePassword)))
 	a.registerUserManagement(m)
+	a.registerCases(m)
+	a.registerWatchlists(m)
+	a.registerDashboard(m)
+	a.registerExports(m)
 	m.Handle("GET /api/entities", a.auth(http.HandlerFunc(a.listEntities)))
 	m.Handle("POST /api/entities", a.auth(http.HandlerFunc(a.createEntity)))
 	m.Handle("PATCH /api/entities/{id}", a.auth(http.HandlerFunc(a.updateEntity)))
@@ -328,7 +338,7 @@ func (a *App) health(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "unavailable", "Veritabanı bağlantısı yok.")
 		return
 	}
-	respond(w, 200, map[string]string{"status": "ok", "product": "XLab Vigil", "mode": "local-development"})
+	respond(w, 200, map[string]string{"status": "ok", "product": "XLab Vigil", "version": productVersion, "mode": "local-development"})
 }
 func (a *App) status(w http.ResponseWriter, r *http.Request) {
 	var initialized bool
@@ -336,7 +346,7 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "unavailable", "Çalışma alanı bilgisi alınamadı.")
 		return
 	}
-	respond(w, 200, map[string]any{"initialized": initialized, "version": "0.4.0", "product": "XLab Vigil", "directoryConnected": false})
+	respond(w, 200, map[string]any{"initialized": initialized, "version": productVersion, "product": "XLab Vigil", "directoryConnected": false})
 }
 
 type credentials struct {
@@ -358,7 +368,7 @@ func (a *App) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Username = strings.ToLower(strings.TrimSpace(in.Username))
 	in.Name = strings.TrimSpace(in.Name)
-	if !usernamePattern.MatchString(in.Username) || len(in.Password) < 12 || len(in.Password) > 128 || len(in.Name) < 2 || len(in.Name) > 100 {
+	if !usernamePattern.MatchString(in.Username) || len(in.Password) < 12 || len(in.Password) > 128 || !textLength(in.Name, 2, 100) {
 		fail(w, 400, "invalid_input", "Adınızı, kullanıcı adınızı ve en az 12 karakterli parolanızı kontrol edin.")
 		return
 	}
@@ -448,6 +458,21 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	// Password verification is expensive, so do it before taking the row lock.
+	// Recheck the verified hash and active account under that lock before
+	// creating a session, in the same order as account/password changes.
+	var lockedUser User
+	var lockedHash string
+	err = tx.QueryRow(r.Context(), `SELECT id,username,name,role,password_hash FROM users WHERE id=$1 AND active FOR UPDATE`, u.ID).Scan(&lockedUser.ID, &lockedUser.Username, &lockedUser.Name, &lockedUser.Role, &lockedHash)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && lockedHash != hash) {
+		fail(w, 401, "invalid_credentials", "Kullanıcı adı veya parola hatalı.")
+		return
+	}
+	if err != nil {
+		dbFailure(w, err)
+		return
+	}
+	u = lockedUser
 	token, err := createSession(r.Context(), tx, u.ID)
 	if err == nil {
 		err = a.audit(r.Context(), tx, u.ID, "session.login", "", "")
@@ -529,6 +554,26 @@ type auditPageResult struct {
 
 var auditLabelActionPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$`)
 
+// parseAuditLabelActions validates optional exact action codes that extend an
+// audit search; they are accepted only together with q.
+func parseAuditLabelActions(q url.Values, hasSearch bool) ([]string, bool) {
+	labelActions := q["labelAction"]
+	if len(labelActions) == 0 {
+		return labelActions, true
+	}
+	if !hasSearch || len(labelActions) > 32 {
+		return nil, false
+	}
+	seen := make(map[string]bool, len(labelActions))
+	for _, action := range labelActions {
+		if len(action) > 80 || !auditLabelActionPattern.MatchString(action) || seen[action] {
+			return nil, false
+		}
+		seen[action] = true
+	}
+	return labelActions, true
+}
+
 func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
 	if currentUser(r).Role != "admin" {
 		fail(w, 403, "forbidden", "Bu kayıtları görüntüleme yetkiniz yok.")
@@ -540,20 +585,10 @@ func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
 		invalid(w, err.Error())
 		return
 	}
-	labelActions := q["labelAction"]
-	if len(labelActions) > 0 {
-		if !hasSearch || len(labelActions) > 32 {
-			invalid(w, "Arama işlemlerini kontrol edin.")
-			return
-		}
-		seen := make(map[string]bool, len(labelActions))
-		for _, action := range labelActions {
-			if len(action) > 80 || !auditLabelActionPattern.MatchString(action) || seen[action] {
-				invalid(w, "Arama işlemlerini kontrol edin.")
-				return
-			}
-			seen[action] = true
-		}
+	labelActions, ok := parseAuditLabelActions(q, hasSearch)
+	if !ok {
+		invalid(w, "Arama işlemlerini kontrol edin.")
+		return
 	}
 	limit, cursor, err := parseListPage(q)
 	if err != nil {
