@@ -1,6 +1,6 @@
 # XLab Vigil
 
-Kurum içindeki personel, hesap, cihaz ve uygulama kayıtları, inceleme grupları ve bağımsız inceleme dosyaları için web uygulaması. Go + React/TypeScript + PostgreSQL. Kaynak ve bu depodaki çalışan kurulum sürümü **1.4.0**; kabul edilmiş son Windows paketi 1.3.5.
+Kurum içindeki personel, hesap, cihaz ve uygulama kayıtları, inceleme grupları ve bağımsız inceleme dosyaları için web uygulaması. Go + React/TypeScript + PostgreSQL. Kaynak ve bu depodaki çalışan kurulum sürümü **1.4.0**; kabul edilmiş son Windows paketi de 1.4.0.
 
 İlk kurulumdan günlük inceleme, olay aktarımı, dosya kararı ve yedekten dönüşe kadar adımlar: [Kullanım rehberi](docs/KULLANIM.md).
 
