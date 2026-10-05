@@ -3,6 +3,8 @@
 $projectRoot = Get-VigilProjectRoot
 Set-Location -LiteralPath $projectRoot
 # A release is always checked. Neither .env nor a user's database is packaged.
+# Release binaries are built without VCS stamps so a docs-only commit keeps
+# them byte-identical to the accepted candidate.
 & (Join-Path $PSScriptRoot 'check.ps1')
 $version = (Get-Content -LiteralPath 'web/package.json' -Raw -Encoding UTF8 | ConvertFrom-Json).version
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Paket sürümü geçersiz.' }
@@ -12,9 +14,9 @@ $name = "xlab-vigil-$version-windows-amd64-" + [DateTime]::UtcNow.ToString('yyyy
 $staging = Join-Path $releaseRoot $name
 foreach ($directory in @('runtime', 'web/dist', 'scripts', 'docs')) { New-Item -ItemType Directory -Path (Join-Path $staging $directory) -Force | Out-Null }
 Invoke-VigilEnvironment @{ GOOS = 'windows'; GOARCH = 'amd64'; GOCACHE = (Join-Path $projectRoot 'runtime/go-cache') } {
-    go build -trimpath -o (Join-Path $staging 'runtime/vigil.exe') ./cmd/vigil
+    go build -trimpath -buildvcs=false -o (Join-Path $staging 'runtime/vigil.exe') ./cmd/vigil
     if ($LASTEXITCODE -ne 0) { throw 'Teslim uygulaması derlenemedi.' }
-    go build -trimpath -o (Join-Path $staging 'runtime/vigil-backup.exe') ./cmd/vigil-backup
+    go build -trimpath -buildvcs=false -o (Join-Path $staging 'runtime/vigil-backup.exe') ./cmd/vigil-backup
     if ($LASTEXITCODE -ne 0) { throw 'Teslim yedek şifreleme aracı derlenemedi.' }
 }
 Push-Location web
