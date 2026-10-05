@@ -1,0 +1,53 @@
+# XLab Vigil 1.3.5 yerel teslim
+
+5 Ekim 2026. Bu sürümün kapsamı yerel, insan tarafından yürütülen inceleme ürünü ve parola ile şifrelenmiş yerel yedektir. Personel/hesap/cihaz kayıtları, gruplar ve üyelikler, doğrudan kırmızı/sarı listeler ve öncelikli üyelik uyarıları, bağımsız inceleme dosyaları, gerekçeli kararlar, olay içe aktarımı/ilişkileri, uygulama içi bildirimler ve denetim geçmişi bulunur. Renkler inceleme önceliğidir; otomatik tehdit veya erişim kararı değildir.
+
+Ekranlar, roller ve baştan sona kurgusal kullanım örneği [KULLANIM.md](KULLANIM.md) içindedir. Yeni teslim paketi, çalışan eski servisin bu sürüme geçirildiği anlamına gelmez; kurulum/güncelleme ayrı uygulanır.
+
+Liste/uyarı görünümü şema 12 üzerinde salt okunur çalışır; yeni SQL göçü veya yedek biçimi değişikliği eklemez. Kırmızı/sarı listeler kapatılmamış üyelikleri, tarihleri başlamamış veya süresi geçmiş olsa da gösterir. Uyarılar yalnız başlangıcı gelmiş açık üyeliklerden hesaplanır; görünür ekranda 30 saniyede bir yenilenir. Varlık adı/tanımlayıcı, birim, grup, gerekçe ve sorumlu üzerinde tam kapsamlı literal arama ve varlık türü seçimi açıkça uygulanır. Üç listenin sayfaları ve sayaçları bu seçimi kullanır; yalnız gösterilen 20 satır aranmaz. Satır sayıları benzersiz kişi sayısı değildir. Yüksek/kritik olay bildirimlerinin okundu bilgisi kullanıcıya özeldir ve liste aramasından bağımsızdır; üyeliği veya dosyayı kapatmaz ve dış ileti teslimatı oluşturmaz.
+
+1.3.2 üst çubuk **Uyarılar / Uyarı özeti** görünümü, tüm kapsamdaki üyelik uyarılarını ve kişisel okunmamış kaynak bildirimlerini ayrı gösterir. Yönetici/analist rol sınırı korunur; liste araması, tür filtresi, sayfalama ve çalışma alanının 1000 kayıt sınırı genel özeti daraltmaz. Bir salt okunur UTC veritabanı anlık görüntüsü iki sayıyı birlikte üretir; okuma hatasında kısmi başarı veya sıfır sayı uydurulmaz. Güncelleme hatasında üst çubuk **!** gösterir; eski sayılar yalnız özet içinde zamanı ve güncel olmadığı açıklamasıyla tutulabilir. Oturum/rol erişimi sona erdiğinde eski özel sayılar kaldırılır. Özet açmak karar veya okundu kaydı yazmaz; şema 12, yedek biçimi ve dış bağlantı sınırları değişmez.
+
+1.3.3 özet tür düğmeleri, ilgili üyelik uyarılarını tüm kapsamda açar ve uyarı başlığına odaklanır. Genel özetten giriş arama/tür seçimini, uygulanmamış filtre taslağını ve üç listenin sayfalarını temizler; liste içindeki tür değişimi kendi uygulanmış kapsamını korur. Bu arayüz geçişi yeni sunucu veri sözleşmesi, SQL göçü, yazma işlemi veya URL derin bağlantısı eklemez; şema 12 ve yedek biçimi korunur.
+
+1.3.4 klavyeyle erişilen **İçeriğe geç** bağlantısı açık modülü, adresini, uygulanmış filtre/sayfalarını ve yazılmakta olan taslaklarını koruyarak ana içeriğe odaklanır. İçerik başlangıcı sabit üst çubuğun altında görünür; sonraki Tab içeriğin kontrollerine ilerler. Açık pencere veya mobil menünün odak sınırı korunur.
+
+1.3.5 ayrı yerel kurulumlar ve kopya provası için HTTP portunun seçilmesini destekler. Dinleyici yalnız literal `127.0.0.1:<port>` adresini ve 1024–65535 aralığını kabul eder; varsayılan HTTP portu 8320'dir. Veritabanı portu ayrı seçilir ve varsayılanı 55440'tır. HTTP ve veritabanı portu aynıysa başlangıç ortam/Docker/süreç/dosya işlemlerinden önce reddedilir. Bu seçim uygulamayı kurum ağına açmaz ve üretim HTTPS/SSO/MFA sağlamaz.
+
+İnceleme dosyası oluşturma/düzenleme, gerekçeli not ekleme, kapatma/yeniden açma ve olay referansı iliştirme/geri alma admin/analyst rollerine açıktır. Değişiklikler beklenen sürümle korunur; işlem, kayıt anı görüntüleri ve denetim aynı veritabanı işlemiyle kaydedilir. Dosya kapanması varlık/grup üyeliğini veya hesap erişimini değiştirmez. Olay ilişkisi bir insanın gerekçeli seçimini kaydeder; dış kaynak veya kimlik doğrulaması değildir.
+
+## Kurulum
+
+Windows x64, PowerShell 5.1+ ve çalışan Docker Desktop gerekir. Varsayılan loopback portları veritabanı için 55440, web için 8320'dir. ZIP'i yeni bir klasöre açın; bu klasörde:
+
+```powershell
+powershell -File scripts/verify-package.ps1
+powershell -File scripts/install.ps1
+powershell -File scripts/start.ps1 -Background
+```
+
+Başlangıç API/veritabanı, web sayfası ve portun doğru sürece ait olmasını bekler. `http://127.0.0.1:8320` üzerinde ilk yönetici hesabını oluşturun. Hazır paket Go, Node veya ayrı age kurulumu gerektirmez; `runtime/vigil.exe`, `runtime/vigil-backup.exe`, web dosyaları ve işletim betikleri birlikte teslim edilir. Üçüncü taraf lisansları [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) içinde bulunur. Docker imajı önbellekte yoksa kurulum resmi PostgreSQL imajını indirir. SHA-256 dosya bozulmasını/değişmesini saptar; yayıncı imzası değildir.
+
+Bağımsız yerel kabulde `COMPOSE_PROJECT_NAME` ile farklı proje, `install.ps1 -DatabasePort <port>` ve `start.ps1 -Port <http-port> -DatabasePort <db-port>` kullanılır. Örneğin boşluğu ve sahipliği doğrulanmış 8330/55441 portlarıyla başlatma `start.ps1 -Port 8330 -DatabasePort 55441 -Background` biçimindedir. Birden fazla yerel kurulum için ayrı klasör, HTTP portu, veritabanı portu ve Compose proje/hacim kimliği gerekir; yalnız HTTP portunu değiştirmek veritabanını ayırmaz. Aynı portu kullanan başka kurulum veya mevcut PostgreSQL ile eşleşmeyen parola başlangıç/kurulumdan önce reddedilir. Betikler geçici ortam değerlerini çağrının sonunda geri yükler. Varsayılan kurulum/yedek işletimi değişmez.
+
+## Güncelleme ve işletim
+
+Aşağıdaki yedek/geri dönüş yolu tamamlanmış şema 11/12 kurulumları içindir. Şema 11 kaynakta önce uygun eski 1.1.0 paketinin kendi `scripts/backup.ps1` betiğini kullanın; şema 12 kaynakta mevcut uyumlu sürümün betiğini kullanın. Yeni betik yalnız şema 12 kaynaktan yedek alır; şema 11 kaynağı yükseltmeden önce eski paketle yedeklenmelidir. Kurtarma parolasını gizli istemle veya aynı PowerShell oturumunda SecureString ile verin; açık komut/ortam değerine yazmayın. Şema 11 yedeğinin yeni ayrı kopyaya dönmesi doğrulanmıştır; bu işlem kopyayı yükseltmez.
+
+Bu çalışma sırasında ana 8320 hizmeti eski **0.3.0** sürümünde, ilk yönetici kurulumu yapılmamış durumda kaldı ve değiştirilmedi. 1.3.4 yerel kabulü ayrı 8321/şema 12 önizlemesinde yapılmıştır. Şema 3/0.3.0'dan yeni sürüme geçiş bu şema 11/12 kabulüyle doğrulanmış sayılmaz; ayrı taşıma planı, mevcut veri/şema incelemesi, uygun yedek yöntemi ve göç doğrulaması gerektirir. 1.3.5 ile başka bir boş loopback portunda açılabilecek yalıtılmış pilotun şema 3 kopyası → şema 12 uygulama başlangıcı → yeni şifreli yedek/ayrı geri yükleme sonuçları henüz bu belgeyle doğrulanmaz; gerçek sonuçlar [DEVIR.md](DEVIR.md) içinde ayrıca kaydedilir. Yeni paket kurulum komutları eski ana hizmet için toplu yükseltme talimatı değildir.
+
+Desteklenen şema 11/12 kurulumunun `.env` dosyası ve Docker `xlab-vigil` veritabanı hacmi korunmalıdır. Güncellemeden önce uygun sürümle yedek alın, ayrı kopyaya geri yükleyip kontrol edin ve eski kurulumun kendi `scripts/stop.ps1` betiğiyle servisini durdurun. Varsayılan şifreli yedek `backup.age` üretir ve gizli istemde iki kez kurtarma parolası ister. Bu parolayı yedekten ayrı kurum kasasında koruyun; kaybolursa yedek açılamaz. Yeni ZIP'i ayrı bir klasöre açın, manifestini doğrulayın ve mevcut `.env` dosyasını bu yerel klasöre güvenli şekilde taşıyın; yeni bir veritabanı parolası üretmeyin. `install.ps1` mevcut veritabanı hacmini korur; planlanmış güncellemede uygulama başlangıcı gerekli göçleri uygular. Göç sonrası eski binary'ye dönmek yerine doğrulanmış yedek/kopya ve uygun sürümle ayrı kurtarma değerlendirmesi gerekir.
+
+`restore-copy.ps1` şifreli ve eski şifresiz yedekleri algılar; ön doğrulamadan sonra yalnız yeni `vigil_restore_...` veritabanına yazar. Tamamlanmış şema 11 ve 12 yedekleri desteklenir; göç sayısı/checksumlar ve gerekli tablolar arşivin şemasına göre doğrulanır. Şema 11 kopyası şema 11 olarak kalır; betik göç çalıştırmaz ve uygulamayı kopyaya geçirmez. Daha sonra uygun uygulama başlangıcıyla yapılacak yükseltme ayrı bir işlemdir; eski yedeğin geri yüklenmesi şema 12 yükseltme kanıtı değildir. Ana veritabanı ve uygulamanın bağlantısı değişmez. Parolayı komuta veya ortam değişkenine açık yazmayın. SecureString/SecretManagement kullanımı, legacy `-Unencrypted` seçimi ve kurtarma provasının kapsamı [YEDEKLEME.md](YEDEKLEME.md) içindedir.
+
+`stop.ps1` arka plan sürecini PID, executable yolu ve başlangıç zamanı ile doğrular; Windows sürecini sonlandırır. Ön planda çalışan uygulama Ctrl+C ile aktif HTTP isteklerini en fazla beş saniye bekleyerek kapanır. Eski yalnız-PID kaydı varsa otomatik durdurma reddedilir. `runtime/server.err.log` başlangıç hatalarını, `runtime/server-process.json` sahip olunan süreç kimliğini tutar.
+
+Kaynak depodaki `check.ps1`, atlamasız Go/PostgreSQL testleri, `go vet`, tasarım tokenları, yanıt sözleşmeleri, TypeScript ve üretim arayüz derlemesini çalıştırır. Test varsayılanı bağımsız geçici PostgreSQL'dir; açıkça `VIGIL_TEST_DATABASE_URL` verildiğinde o veritabanında rastgele şemalar kullanılır. `package.ps1` aynı kontrolleri çalıştırıp ayrı klasörde iki executable, statik dosyalar, işletim betikleri, belgeler ve dosya hash manifesti içeren ZIP üretir. Sırlar, yedek parolası, DB ve kullanıcı verileri paketlenmez.
+
+## Teslim sınırı
+
+Canlı AD/LDAP, WEF, Palo Alto, Logsign ve Trend toplayıcıları; gerçek SMTP/Graph gönderimi; üretim HTTPS/SSO/MFA; dar dosya/grup yetkileri ve yüksek hacim kabulü bu teslimin kapsamında değildir. Dosyalar için rol sınırı admin/analyst'tir; kişiye veya dosyaya özel erişim listesi uygulanmaz. Kaynak ve posta profili kaydı bağlantı/teslim kanıtı değildir. Yerel testler kurumsal entegrasyon veya üretim kabulü sayılmaz.
+
+Varsayılan yedek standart age parola şifrelemesi kullanır; Windows hesabına bağlı DPAPI kullanmaz. Şifreleme/geri yükleme sırasında kullanıcıya özel geçici açık dosyalar oluşur. İşlem sonunda dosya temizliği diskte güvenli silme değildir; disk şifrelemesi ve kurum depolama politikası ayrıca gerekir. Aktif oturum verisi yedeğe girmez. `-Unencrypted` ile oluşturulan legacy paketler şifreli değildir. Bağımsız kriptografi denetimi yapılmış olduğu iddia edilmez.
+
+Çalıştırılan yerel doğrulamalar ve açık kalan sınırlar [DEVIR.md](DEVIR.md) içinde tarihleriyle kaydedilir. 1.0.0/1.1.0 sonuçları önceki sürümlere aittir; 1.2.0 inceleme dosyaları, şema 12 yedek/restore ve şema 11 geri yükleme uyumluluğu kabulünün yerine geçmez. 1.2.1 kullanım rehberi/rol gezinmesi, 1.3.0 liste/uyarı, 1.3.1 liste genelinde arama/tür, 1.3.2 genel uyarı özeti, 1.3.3 özetten tür geçişi, 1.3.4 klavye/odak ve 1.3.5 yerel port seçimi değişikliklerinin doğrulaması ayrı sürüm kanıtlarıyla kaydedilir. Bu belge işletim sözleşmesini anlatır, tek başına kabul sonucu değildir.

@@ -1,6 +1,6 @@
 # XLab Vigil local development contract
 
-Implementation agreement, started 22 September 2026 and amended 23 September 2026. Go service at 127.0.0.1:8320 (test 8321), database at 55440, frontend dev 4320. Independent product `XLab Vigil`, module `xlabvigil`, cookie `vigil_session`, environment `VIGIL_*`. Existing auth endpoints /api/status, /setup, /login, /session, /logout retained. Current status version is 0.4.0 and product XLab Vigil; directoryConnected=false. No records/note or records/project routes.
+Implementation agreement, started 22 September 2026; current local release 1.3.3 (4 October 2026). Go service at 127.0.0.1:8320 (test 8321), database at 55440, frontend dev 4320. Independent product `XLab Vigil`, module `xlabvigil`, cookie `vigil_session`, environment `VIGIL_*`. Existing auth endpoints /api/status, /setup, /login, /session, /logout retained. Health and status share version 1.3.3; directoryConnected=false. No records/note or records/project routes. Historical section numbers identify implementation slices, not the current release version. Current acceptance evidence is in DEVIR.md; local tests do not establish live integration or production acceptance.
 
 All arrays return [] when empty, error on database failure. ISO timestamps and date-only YYYY-MM-DD membership dates. All mutation inputs strict JSON, same-origin, authenticated. Admin/analyst can read/write risk objects; member/viewer cannot access these sensitive objects in this slice. Admin alone reads audit. No data is seeded in the real database except the schema; demo fixtures are browser-only.
 
@@ -14,7 +14,7 @@ GET /api/sources returns static catalog [{id,name,category,status,description}],
 
 GET /api/audit retains existing shape [{id,actor,action,kind,createdAt}] admin only. Its legacy 1000-record maximum remains (+1 detects overflow); 422 collection_limit instead of silently truncated results. `GET /api/audit/page` is the admin-only paged alternative and returns `{items:[{id,actor,action,kind,createdAt}],nextCursor}`. Default limit 50, maximum 100; omit cursor for the first page. Supplied limit and cursor must each be one canonical positive decimal value; invalid values return 400 invalid_input. Optional `q` follows the event-search validation below and searches actor name, action code, and record kind as a case-insensitive literal substring before pagination. The UI may send up to 32 distinct `labelAction` values with `q` to include action codes whose visible Turkish labels match the phrase; these codes are exact matches and cannot be sent without `q`. Rows are ordered by descending audit ID; `nextCursor` is the last returned ID as a string when another row exists, otherwise `""`. Each page is a fresh read, not a frozen snapshot or total count. GET /api/memberships/{id}/history returns [{version,action,actor,createdAt,data}] admin/analyst, data membership snapshot. Membership create/update history plus audit transaction atomic. Its list maximum remains 1000 (+1 detects overflow); 422 collection_limit instead of silently truncated results.
 
-Errors {code,message}; missing404, permission403, stale409, invalid_input400, unavailable503. New standalone schema with versioned migration ledger. No shared database or session access to Nexus. SSO/MFA, file export, source-specific ingestion, per-case authorization and real AD verification remain future work.
+Errors {code,message}; missing404, permission403, stale409, invalid_input400, unavailable503. New standalone schema with versioned migration ledger. No shared database or session access to Nexus. SSO/MFA, file export beyond the CSV exports described in the 1.4.0 dashboard and CSV export section, source-specific ingestion, narrower per-case access lists and real AD verification remain future work. Independent cases use the current admin/analyst role boundary.
 
 ## 0.3 source configuration and normalized import
 
@@ -52,7 +52,7 @@ Evidence items add `evidence:{id,eventId,title,severity,eventOccurredAt,originPr
 
 Order is stored action time descending, then source rank and local sequence descending for equal timestamps. Membership version and evidence sequence are distinct ordered branches. Each branch contributes at most `limit+1` candidates to the bounded union; the previous membership version is joined for returned history entries. The parent check and page query share one read-only repeatable-read transaction. Separate pages are fresh reads, with no frozen multi-page snapshot, total count, or transaction commit-order guarantee. Refresh the first page to see newly visible actions. Existing `/history` and `/event-evidence` contracts remain available.
 
-Migration 10 adds membership/time/version and evidence/attachment-time/sequence indexes, plus a partial retraction-time index. It adds no event storage and does not alter historical rows. The new activity endpoint, migration, and UI have not been runtime-validated in this development slice.
+Migration 10 adds membership/time/version and evidence/attachment-time/sequence indexes, plus a partial retraction-time index. It adds no event storage and does not alter historical rows. Current local runtime evidence is recorded in DEVIR.md; no production-volume acceptance is implied.
 
 ## 0.26 explicit membership review decisions
 
@@ -68,7 +68,7 @@ The activity endpoint exposes one `membership.reviewed` item with existing `befo
 
 Generic `PATCH /api/memberships/{id}` retains its existing status/date editing contract and emits `membership.updated`. Such an edit does not imply that a separate review decision was recorded. The review rationale requirement applies to the dedicated review endpoint.
 
-Migration 11 extends the membership history action constraint and adds `membership_reviews`, keyed by membership ID/version and linked to that exact history row. Historical rows are not backfilled as decisions. This slice has not been tested, built, browser-validated, or applied to a running database.
+Migration 11 extends the membership history action constraint and adds `membership_reviews`, keyed by membership ID/version and linked to that exact history row. Historical rows are not backfilled as decisions. Isolated PostgreSQL migration and review tests, frontend build, and local browser acceptance are recorded in DEVIR.md.
 
 ## 0.27 review queue presentation and workspace refresh
 
@@ -76,7 +76,7 @@ The review queue uses the existing full `/memberships` collection; it introduces
 
 Using one browser UTC date per render, the UI classifies closed memberships first, then open memberships whose end date is before today, then overdue/today review dates, then dates from tomorrow through today+7 inclusive, and finally later dates. Scheduled open memberships can appear in the upcoming bucket. This schedule classification does not depend on the computed `active` boolean and does not modify membership state. The attention queue combines expired-open, overdue, and today; it orders by review date, end date, then membership ID. Expiry is not closure or proof that a review decision occurred.
 
-Transient workspace refresh failure retains the last snapshot only to preserve open forms. The main content shows the failure instead of current counts, and modal notices expose retry. Editor, membership decision, and event-reference writes are blocked until a full workspace refresh succeeds; their drafts remain mounted. A targeted membership GET does not certify the other workspace collections. Authentication/authorization failures clear cached workspace and dialog selections. These frontend changes have not been built or runtime-validated.
+Transient workspace refresh failure retains the last snapshot only to preserve open forms. The main content shows the failure instead of current counts, and modal notices expose retry. Editor, membership decision, and event-reference writes are blocked until a full workspace refresh succeeds; their drafts remain mounted. A targeted membership GET does not certify the other workspace collections. Authentication/authorization failures clear cached workspace and dialog selections. Current frontend build and local browser evidence are recorded in DEVIR.md; those records define the observed runtime coverage.
 
 ## 0.28 latest explicit review context
 
@@ -103,3 +103,162 @@ Migrations 2–11 append source/event/inbox/configuration and user-lifecycle fie
 Migration 4 adds `active`, `version`, and `updated_at` to existing local users; existing accounts remain active. Authentication rejects inactive accounts even if a stale session row exists. SSO, MFA, production HTTPS, administrator password resets, and finer-grained authorization remain future work.
 
 `POST /api/session/password` is available to any active signed-in user and accepts `{currentPassword,newPassword}`. Both values are limited to 128 bytes; the new password must contain at least 12 bytes and differ from the current password. The current password is verified before updating. A per-remote-host limiter allows 20 change attempts per 15 minutes. The current session remains valid; all other sessions for that user are revoked in the same transaction. User version and `updated_at` advance, and `session.password_changed` is audited atomically. Concurrent password changes are rejected with `409 stale_password` after rechecking the stored hash under a row lock.
+
+## 1.2 independent human review cases
+
+All `/api/cases` routes require admin/analyst. Member/viewer access is rejected; the responsible label does not assign permissions. No per-case access list is implemented. A case is independent from entities, groups, and memberships: case actions never change a membership, account access, source configuration, or the imported event. They record human decisions without automatic threat classification or external-source/identity verification.
+
+The `Case` response is `{id,title,summary,responsible,status,version,createdAt,updatedAt,createdById,createdBy,closedAt,closureReason}`. `status=open|closed`; an open case has `closedAt:null` and `closureReason:""`. A closed case has its closure time and rationale. The creator name is captured at creation. Text fields are trimmed and measured in Unicode characters: title 3–160, summary 10–2000, responsible 2–100. The responsible value is a free-text label, not a verified user or assignment.
+
+`GET /api/cases` returns `{items:[Case],nextCursor}`. Only `q`, `status`, `limit`, and `cursor` are accepted; duplicate or unknown parameters return 400. Omitted status means all; explicit values are `all|open|closed`. `q` uses the existing event-search validation (trimmed 3–120 Unicode characters; literal, case-insensitive substring) across title, summary, and responsible. `%`, `_`, and backslash remain literal text. The filters run before pagination. Default limit 20, maximum 100; limit/cursor must be one canonical positive decimal value when supplied. Order is creation sequence descending, independent of last update time. `nextCursor` is a positive sequence string when another page exists and `""` otherwise. Each page is a fresh read, with no total count or frozen multi-page snapshot. Changing search/status starts a new first-page read. `GET /api/cases/{id}` returns the current flat `Case`, or 404.
+
+`POST /api/cases` accepts strict JSON `{id,title,summary,responsible}`, where the client provides a draft UUID. A new case returns 201 with a flat `Case`, version 1 and status open. Retrying the same UUID with the same normalized creation fields and creator returns 200 with the authoritative current case, even after later edits or closure; it adds no second history or audit row. A reused UUID with different original content or another creator returns `409 case_id_conflict`. Creation payload and creator identity are stored independently from editable fields; a UI retry must preserve the original draft UUID/content until the outcome is known.
+
+`PATCH /api/cases/{id}` accepts the complete `{title,summary,responsible,expectedVersion}` and returns 200 with the updated flat `Case`. Only open cases can be edited. `POST /api/cases/{id}/actions` accepts `{action,reason,expectedVersion}`, with `action=note|close|reopen` and a trimmed 10–2000-character rationale; it returns 201 with `{case,activity}`. Note and close require an open case; reopen requires a closed case. Note advances the version without changing case fields. Close sets status, closure time and rationale; reopen clears the current closure fields while preserving prior closure snapshots/history. Every accepted mutation advances the locked case version exactly once. Stale versions return `409 case_conflict`; closed-case writes return `409 case_closed`, and reopening an open case returns `409 case_open`. Missing cases return 404. The browser preserves drafts on conflict and requires an explicit targeted reload before another write.
+
+`GET /api/cases/{id}/activity` returns `{items:[{id,caseId,version,action,reason,actorId,actor,occurredAt,before,after}],nextCursor}`. Actions are `created|updated|noted|closed|reopened|event_attached|event_retracted`; `before:null` only for creation and `after` is the full `Case` at that version. Creation/update have empty separate rationale; the other actions record the supplied rationale. Actor names are captured when the action occurs. Only `limit` and `cursor` are accepted, using default20/max100 and the same canonical positive decimal rules. History is ordered by its own sequence descending. Parent existence and the page read share one read-only repeatable-read transaction; different pages are fresh reads. Case update, its before/after snapshots, history and audit commit atomically. Audit actions are `case.created`, `case.updated`, `case.noted`, `case.closed`, `case.reopened`, `case_evidence.attached`, and `case_evidence.retracted`; audit reading remains admin-only. These database rows are not independent tamper-proof storage.
+
+`GET /api/cases/{id}/event-evidence` returns `{items,nextCursor}` with default20/max100, only limit/cursor, and reference sequence descending. It includes attached and retracted references. An item is `{id,caseId,eventId,reason,status,attachedBy,attachedById,attachedAt,retractedBy,retractedById,retractedAt,retractionReason,event}`; the nested event retains the existing security-event shape. `status=attached|retracted`. An attached item has `retractedAt:null` and empty retraction actor/rationale fields. Actor names are captured with attachment and retraction. Parent existence/page reads use one repeatable-read transaction; missing parents return 404.
+
+`POST /api/cases/{id}/event-evidence` accepts `{eventId,reason,expectedVersion}` and returns 201 with `{case,evidence}`. `POST /api/cases/{id}/event-evidence/{evidenceId}/retract` accepts `{reason,expectedVersion}` and returns 200 with `{case,evidence}`. Reasons are trimmed 10–1000 Unicode characters. Both require the current version of an open case and lock the case before the reference. Existing candidate or unlinked `manual_import` events can be deliberately selected; no entity relationship is inferred. Only one attached reference per case/event is allowed (`409 event_already_attached`). Retraction retains the original reference and rationale, records its own actor/time/reason, and rejects another retraction (`409 evidence_already_retracted`). A later attachment can create a new reference after retraction. Missing events/references return 404. Attach/retract advances the case version and writes case history/audit in the same transaction. The imported event's provenance and candidate identity meaning stay unchanged.
+
+Migration 12 adds `investigation_cases`, `case_history`, and `case_event_evidence`, with case version/history uniqueness, protected foreign-key references, case/status pagination indexes, and literal-search trigram indexing. It seeds no cases and changes no historical migration checksum. Current backup creation requires the completed 1–12 ledger; restore supports exact completed 1–11 or 1–12 archives with schema-dependent required tables and checksum matching. A restored schema-11 copy remains schema 11; restore neither upgrades it nor switches the application.
+
+Acceptance covers role rejection, strict inputs/search/cursors, immutable-create replay, expected-version races, note/close/reopen, recorded snapshots/actor names, event attach/retract, migration 11→12 preservation, encrypted schema-12 round-trip and schema-11 archive compatibility. Executed results are recorded in DEVIR.md; this contract does not mark unexecuted checks as passed or establish production/integration acceptance.
+
+## 1.3 direct watchlists and prioritized membership alerts
+
+`GET /api/watchlist-overview` requires admin/analyst; member/viewer cannot read this risk context. It is a read-only overview of persisted memberships, entities, groups, and the signed-in user's source-event inbox receipts. It adds no migration: schema 12 and backup/restore formats remain unchanged. The endpoint does not save a review decision, close or edit a membership, create an event notification, write an audit action, contact a source, or change account/network access.
+
+In 1.3.1, only `q`, `entityKind`, `limit`, `redCursor`, `yellowCursor`, `alertCursor`, and `alertKind` are accepted, once each. `limit` is a canonical positive decimal with default 20 and maximum 100; it applies separately to each of the three pages. `entityKind` defaults to `all`; explicit values are `all|person|account|device|service|application`. `alertKind` defaults to `all`; allowed values are `all|expired|review_due|red_priority|review_upcoming`. Unknown/duplicate keys, malformed query escaping, invalid limit, or invalid kind return `400 invalid_input`. Omit a cursor for a first page; a supplied empty or invalid cursor returns `400 invalid_cursor`.
+
+Omit `q` for no search; the response then contains `selection.q=""`. A supplied `q` uses the shared event-search validation: trim surrounding whitespace, require 3–120 Unicode characters, and reject control characters, invalid UTF-8, duplicate values, and malformed escaping. Explicit empty/whitespace-only `q` is invalid. Matching is a case-insensitive literal substring over entity name, identifier, department, group name, membership reason, and responsible. `%`, `_`, and backslash remain text. The entity's direct fields are searched; no automatic expansion through a related person's identity occurs. Search and entity kind apply to the entire matching collection before all red/yellow/alert counts and pagination, not only the returned 20 rows.
+
+The success response is:
+
+```text
+{
+  asOf: "YYYY-MM-DD",
+  generatedAt: ISO-UTC-timestamp,
+  selection: {q: normalized-trimmed-string, entityKind: "all" | EntityKind},
+  red: {items: [Entry], nextCursor: "", total: integer, activeCount: integer},
+  yellow: {items: [Entry], nextCursor: "", total: integer, activeCount: integer},
+  alerts: {
+    items: [{kind: AlertKind, record: Entry}],
+    nextCursor: "",
+    total: integer,
+    filter: "all" | AlertKind,
+    counts: {expired: integer, review_due: integer, red_priority: integer, review_upcoming: integer}
+  },
+  sourceNotifications: {unreadCount: integer}
+}
+```
+
+`Entry` is `{membership:Membership,entity:Entity,group:Group}` using the existing full object shapes. `EntityKind` is `person|account|device|service|application`; `AlertKind` excludes `all`. `selection` echoes the canonical applied query and entity-kind scope. Arrays are `[]` when empty, cursor strings are `""` when no later row exists, and counts are nonnegative integers. `asOf` is the server's UTC date and `generatedAt` its UTC snapshot timestamp. One read-only repeatable-read transaction supplies both timestamps, all rows and counts, and the personal source notification unread count. Separate page requests are fresh reads, not a frozen multi-page snapshot.
+
+Red/yellow lists include every membership matching `selection` with stored `status=active` in the corresponding current group color. Here `status=active` means the membership has not been closed; it is distinct from the date-dependent `membership.active` boolean. Expired and scheduled open memberships remain in these direct lists. `total` counts all selected open membership rows of that color; `activeCount` counts those with `startsOn <= asOf <= endsOn`. Counts are over the entire matching collection, not the returned page or unique people/accounts. One entity in several groups can contribute several rows. Lists order by ascending `(reviewOn,membership.id)`.
+
+Alerts include open memberships of **all** group colors only when `startsOn <= asOf`. Each eligible membership receives at most one kind, in this priority order:
+
+1. `expired`: `endsOn < asOf`.
+2. `review_due`: not expired, and `reviewOn <= asOf`.
+3. `red_priority`: neither previous kind, and active on `asOf` in a red group.
+4. `review_upcoming`: none of the previous kinds, and `asOf < reviewOn <= asOf+7 days`.
+
+Ends are inclusive; the seventh upcoming day is inclusive. Closed or not-yet-started memberships produce no alert. Alert order is ascending `(priority rank,reviewOn,membership.id)` with ranks 1–4 above. The selected `alertKind` filters before pagination. `alerts.total` is the full selected alert-kind count within `selection`; with `all` it equals the sum of the four counts. `alerts.counts` always describes all four kinds matching the applied search/entity kind, independent of the selected alert kind or page. `sourceNotifications.unreadCount` counts all high/critical event inbox items not read by this user, independent of watchlist search, entity kind, pages, or alert filter. The count is not a membership alert count, review decision, case status, or external mail-delivery receipt.
+
+Cursors are opaque, canonical RawURL-base64 values. Version 2 has the ordered scalar fields `{version,scope,asOf,filter,reviewOn,id,rank,searchKey,entityKind}` and is limited to 2048 characters. `searchKey` is RawURL-base64 of the canonical query's UTF-8 bytes, or `""` for no search; the inner key keeps cursor JSON ASCII for Turkish/Unicode input. Each cursor binds its list scope (`red|yellow|alerts`), UTC `asOf`, exact normalized search, and entity kind; an alert cursor also binds `alertKind`, while direct-list filter is `""`. The last-row position includes the alert rank where applicable. Version 1, cross-scope, changed-query/type/filter, previous-day, malformed, or noncanonical cursors return `400 invalid_cursor`. Use new first-page reads after changing search/entity kind or UTC day; changing alert kind resets only the alert page. A valid cursor cannot freeze rows against later membership changes. Changing `limit` does not change cursor scope.
+
+The watchlist page has its own explicit apply form: editing text/type is a draft; `Ara` applies both and resets all three cursor histories. Blank applied search omits `q`. `Filtreleri temizle` removes the search/type selection and restarts pages while retaining the selected alert kind; `Listeleri baştan yükle` restarts pages while preserving the applied selection. The global header search is hidden for this page. Visible 30-second polling uses the last applied selection and current pages; UTC day or a locally saved membership change resets the pages while preserving that selection. A rejected cursor remains an explicit error with a first-page reload action; other read errors also expose retry. Request-bound validation checks `selection`, entity type, and cursor scope; it does not pretend JavaScript casing exactly reproduces PostgreSQL `ILIKE`. Background reads do not apply an unfinished search draft, submit a review, or silently reconcile its version. The existing inbox refresh is personal, does not poll mail settings, and waits while a write or mail-profile edit is open.
+
+Closing a membership removes it from these open lists and alerts. A successful continue decision moves its review date and can remove `review_due`; an active red membership can still receive `red_priority`, and an upcoming date can still produce `review_upcoming`. These are current human-review work cues. The older full-collection review queue has its separate schedule presentation, including scheduled upcoming rows; it is not this endpoint's started-only alert rule.
+
+Verification should cover admin/analyst access and member/viewer rejection, strict query/cursor inputs, each search field and entity kind, Unicode/literal matching, selection echoes, full-scope counts, cross-query/type/version cursor rejection, all four date priorities and UTC boundaries, planned/expired direct-list rows, multi-membership counts, personal unread receipts, closure/continue transitions, read-only persistence, explicit failures, and unapplied-search/review draft preservation. Executed evidence belongs in DEVIR.md; this section does not mark pending checks as passed or establish live-source or production acceptance.
+
+## 1.3.2 global warning summary
+
+`GET /api/watchlist-summary` requires authentication and admin/analyst risk access. Member/viewer cannot read these counts. The endpoint accepts no nonempty query string; any such input, including unknown keys, empty parameter values, or malformed escaping, returns `400 invalid_input`. It has no search, kind filter, limit, or cursor. The existing overview/search/cursor contract remains unchanged.
+
+The success response is:
+
+```text
+{
+  asOf: "YYYY-MM-DD",
+  generatedAt: ISO-UTC-timestamp,
+  alerts: {
+    total: integer,
+    counts: {expired: integer, review_due: integer, red_priority: integer, review_upcoming: integer}
+  },
+  sourceNotifications: {unreadCount: integer}
+}
+```
+
+All counts are nonnegative integers; `alerts.total` equals the sum of the four kinds. Membership alerts use the overview's same started/open rule, all group colors, inclusive UTC boundaries, and one-priority-per-membership classification. They cover the full collection without the workspace's 1000-row limit or the watchlist page's applied search/entity kind/alert-kind filters. They count membership rows, not unique people or verified threats. `sourceNotifications.unreadCount` separately counts this user's unread high/critical source-event inbox notifications; it is not added to the membership total.
+
+One read-only repeatable-read transaction supplies the UTC date, snapshot timestamp, both aggregates and personal unread receipts. Dependency failure returns `503` with the existing flat error shape; no partial success or substituted zero counts is returned. Authentication/access errors use the existing `401`/`403` shape. The endpoint adds no migration and writes no review decision, read receipt, audit, event, or access change. Schema 12 and backup/restore formats remain unchanged; it contacts no external source or delivery provider.
+
+The role-restricted header button `Uyarılar` opens the shared `Uyarı özeti` modal. The fresh header badge shows the membership review total, visually shortened to `99+` above 99; the full total remains in the accessible name and modal. The accessible name also distinguishes the personal unread count. The modal separates `İnceleme uyarıları` and `Kişisel kaynak bildirimleri`, with `Listeleri ve uyarıları aç`, `Bildirimleri aç`, and `Özeti yenile` actions. Opening the summary does not mark notifications read or close a membership/case. Counts do not use the global header search or the watchlist page's applied filters. Visible 30-second refresh, visibility return and explicit retry update the summary without remounting open forms or applying drafts. Successful membership changes, source-event imports and personal read writes invalidate the summary independently of their page's next read.
+
+Loading/read/shape failures never appear as a successful zero. After a refresh failure, the header replaces the numeric review count with `!`; a last valid snapshot may appear only inside the modal with its date/time and an explicit not-current message. `401`/`403`, account changes and demo/real-mode changes discard previous cached private counts. The demo summary is labelled synthetic and does not call the real endpoint. Successful-response validation checks timestamp/date consistency, all count fields and the sum before displaying a fresh number.
+
+Verification should cover strict query rejection, both allowed roles and member/viewer denial, uncapped aggregates, all date priorities, equality with an unfiltered overview, per-user unread independence, consistent read-only snapshots, dependency failure without partial counts, malformed successful responses, stale/error/auth clearing, membership/read refresh, draft preservation and the header/modal at 320px. Executed acceptance belongs in DEVIR.md; this contract does not mark pending checks as passed.
+
+## 1.3.3 summary-to-category navigation
+
+The summary's four review categories are actions that open the watchlist board with the corresponding `alertKind`. `Listeleri ve uyarıları aç` opens `all`. Every entry from this global summary deliberately clears the board's applied and draft search, entity-kind selection, all three cursors and pagination histories; it opens the selected alert kind over the full collection and focuses the alert heading. The same action also works when the board is already mounted and when selecting the same kind again. It does not silently leave an old narrowed scope under a global count.
+
+Changing alert kind within the board retains that board's applied search/entity kind and its red/yellow page positions; only warning pagination resets. These are two explicit navigation contexts. A category with zero items remains a valid empty read, not a review decision. Stale summary numbers remain labelled not-current; category navigation fetches the destination through the existing overview response validation and error/retry flow.
+
+This slice adds no URL query/deep-link contract, server data route, migration, or database write. Summary and overview JSON/query/cursor contracts, admin/analyst access, schema 12 and backup formats remain unchanged; health/status version is 1.3.3. Navigation does not mark notifications read, resolve an alert, submit a draft, or alter account access. Verification should cover every kind and `all`, repeat entry on a mounted board, draft/search/type/cursor reset, local-filter preservation, uncapped scope, empty/error/stale states and keyboard/mobile heading focus. Executed acceptance belongs in DEVIR.md; pending checks are not marked passed here.
+
+## 1.4.0 dashboard summary and CSV exports
+
+No SQL migration: schema 12, backup formats and the health/status contract are unchanged. All endpoints require a session and use the flat `{code,message}` error shape: anonymous `401 unauthorized`, wrong role `403 forbidden`, invalid query `400 invalid_input`, dependency failure `503 unavailable`. None of them contacts an external source.
+
+### GET /api/dashboard
+
+Admin/analyst only; member/viewer `403`. No query parameters are accepted: any non-empty query string (unknown key, empty value or malformed escape) returns `400 invalid_input`. One read-only repeatable-read transaction supplies every count and the database clock; a failure is never reported as zero or partial success. The endpoint writes no audit row.
+
+```text
+{
+  generatedAt: ISO UTC timestamp (database transaction time),
+  eventTrend: [
+    {day: "YYYY-MM-DD", info: integer, low: integer, medium: integer, high: integer, critical: integer},
+    ... exactly 14 items
+  ],
+  eventSeverityTotals: {info: integer, low: integer, medium: integer, high: integer, critical: integer},
+  eventTotal: integer,
+  cases: {open: integer, closed: integer},
+  sourceCount: integer
+}
+```
+
+`eventTrend` is oldest first and ends on the UTC day of `generatedAt`; events are bucketed by the UTC calendar day of `occurredAt`, and days or severities without events are `0`. Severity keys are the values accepted by import: `info|low|medium|high|critical`. Events before the window or after today (import accepts at most five minutes of future skew) are outside the trend, while `eventSeverityTotals` and `eventTotal` count all events of all time; `eventTotal` equals the sum of the severity totals. `cases` counts investigation cases by status; `sourceCount` counts saved source connection profiles (the `/api/connections` collection), not the static `/api/sources` catalog. These are management counts, not live source coverage, a risk score or a verified threat decision. The UI rejects a trend that is not exactly 14 consecutive UTC days.
+
+### CSV exports
+
+| Path | Access | Query | File name | Audit action / kind |
+| --- | --- | --- | --- | --- |
+| `GET /api/events/export` | admin/analyst | `connectionId`, `severity`, `q` | `vigil-olaylar-…csv` | `events.exported` / `security_event` |
+| `GET /api/cases/export` | admin/analyst | `status`, `q` | `vigil-dosyalar-…csv` | `cases.exported` / `case` |
+| `GET /api/audit/export` | admin only | `q`, `labelAction` | `vigil-islem-gunlugu-…csv` | `audit.exported` / `audit_event` |
+| `GET /api/entities/export` | admin/analyst | none | `vigil-varliklar-…csv` | `entities.exported` / `entity` |
+| `GET /api/memberships/export` | admin/analyst | none | `vigil-uyelikler-…csv` | `memberships.exported` / `membership` |
+
+Filters mean the same as on the matching list endpoint: event connection UUID, severity and the literal search rules of `GET /api/events`; case `status=all|open|closed` (default `all`) and the `GET /api/cases` search; audit search of `GET /api/audit/page` with at most 32 distinct `labelAction` values, only together with `q`. There is no `limit` or `cursor`. An unknown key, a repeated single-value key or an invalid value returns `400 invalid_input`. Entity and membership exports reject any non-empty query string. Ordering: events and cases by newest sequence, audit by newest ID, entities and memberships by most recent update.
+
+Only `GET` is served. The router would otherwise route `HEAD` to these handlers, and because every export writes an audit row, `HEAD` (and any other method) returns `405 method_not_allowed` with `Allow: GET` before authentication and without an audit row.
+
+A successful response is `200` with `Content-Type: text/csv; charset=utf-8`, `Cache-Control: no-store` and `Content-Disposition: attachment; filename="vigil-<olaylar|dosyalar|islem-gunlugu|varliklar|uyelikler>-YYYYMMDDTHHMMSSZ.csv"`; the file-name time is the database transaction time in UTC. The body starts with a UTF-8 BOM, uses a semicolon (`;`) delimiter for Turkish-locale spreadsheet programs, CRLF line endings and RFC 4180 quoting (a field containing the delimiter, a double quote or a line break is quoted; line breaks inside a field are written as CRLF and a lone CR is not preserved). The first row is a Turkish header. Timestamps are RFC 3339 UTC to the second (`2026-10-05T12:00:00Z`); membership dates are `YYYY-MM-DD`; empty or null values are empty cells. Codes such as severity, category, status, kind and color are written as their raw API values. To stop a spreadsheet from evaluating a cell as a formula, every cell starting with `=`, `+`, `-`, `@`, tab or CR gets a leading single quote (`'`), so such a value is one character longer than its source text.
+
+Header columns:
+
+- Events: `Olay zamanı (UTC);Alınma zamanı (UTC);Önem;Kategori;Başlık;Özet;Hesap / özne;Cihaz;Kaynak IP;Bağlantı;Aktarım kayıt kimliği;Kimlik durumu;Varlık kimliği;Veri kökeni;Özgün ürün;Özgün olay kimliği`. `Bağlantı` is the source connection name, or its ID when no name is found.
+- Cases: `Başlık;Durum;Sorumlu;Özet;Oluşturulma zamanı (UTC);Oluşturan;Güncellenme zamanı (UTC);Kapanış zamanı (UTC);Kapatma gerekçesi;Sürüm`. `Oluşturan` is the name recorded at creation.
+- Audit: `İşlem zamanı (UTC);İşlemi yapan;İşlem;Kayıt türü`. Action and kind are raw codes.
+- Entities: `Ad;Tür;Tanımlayıcı;Birim;Açıklama;Bağlı kişi;Oluşturulma zamanı (UTC);Güncellenme zamanı (UTC)`. `Bağlı kişi` is the name of the person entity linked to an account or device, otherwise empty.
+- Memberships: `Varlık adı;Varlık türü;Varlık tanımlayıcısı;Grup adı;Grup rengi;Gerekçe;Sorumlu;Başlangıç tarihi;Bitiş tarihi;Gözden geçirme tarihi;Durum;Bugün etkin;Oluşturulma zamanı (UTC);Güncellenme zamanı (UTC)`. `Durum` is `active|closed`; `Bugün etkin` is `evet|hayır`, computed with the same rule as the membership `active` field for the UTC day of the transaction time.
+
+An export holds at most 10,000 data rows. The query reads 10,001 rows; when more than 10,000 match, the response is `422 export_too_large` with a Turkish message asking to narrow the filter. Data is never silently truncated, and no file or audit row is produced in that case.
+
+Reading the rows and inserting the `audit_events` row (`record_id` null, actor = session user) happen in one database transaction, and the CSV body is sent only after that transaction commits. If the audit row cannot be written or the commit fails, a JSON error (`503 unavailable` or the matching `409`) is returned and no CSV content is sent. An audit export does not contain its own new audit row; that row appears in later reads. The audit row does not store which filter was used or how many rows were delivered. Once downloaded, the file is outside the application's access control; protecting it is the user's and the institution's responsibility.
