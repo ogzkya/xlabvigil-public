@@ -13,6 +13,29 @@ import {
 import type { BadgeTone } from "./design";
 import { formatDateUTC } from "./dateTime";
 
+const modalStack: HTMLElement[] = [];
+let modalBackground: { shell: HTMLElement | null; inert: boolean; overflow: string } | null = null;
+function registerModal(backdrop: HTMLElement) {
+  if (!modalStack.length) {
+    const shell = document.querySelector<HTMLElement>(".app-shell");
+    modalBackground = { shell, inert: shell?.inert ?? false, overflow: document.body.style.overflow };
+    if (shell) shell.inert = true;
+    document.body.style.overflow = "hidden";
+  }
+  modalStack.push(backdrop);
+  for (const item of modalStack) item.inert = item !== backdrop;
+  return () => {
+    const index = modalStack.indexOf(backdrop);
+    if (index !== -1) modalStack.splice(index, 1);
+    for (const item of modalStack) item.inert = item !== modalStack.at(-1);
+    if (!modalStack.length && modalBackground) {
+      document.body.style.overflow = modalBackground.overflow;
+      if (modalBackground.shell) modalBackground.shell.inert = modalBackground.inert;
+      modalBackground = null;
+    }
+  };
+}
+
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="brand">
@@ -206,6 +229,8 @@ export function Modal({
   children,
   wide = false,
   closeDisabled = false,
+  bare = false,
+  className = "",
 }: {
   title: string;
   subtitle?: string;
@@ -213,6 +238,9 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
   closeDisabled?: boolean;
+  /** Visually hidden title and no close button; Escape and the backdrop close it. */
+  bare?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -223,11 +251,8 @@ export function Modal({
   };
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    const shell = document.querySelector<HTMLElement>(".app-shell");
-    const previousInert = shell?.inert ?? false;
-    if (shell) shell.inert = true;
-    document.body.style.overflow = "hidden";
+    const backdrop = ref.current?.parentElement;
+    const unregister = backdrop ? registerModal(backdrop) : () => {};
     const focusables = () =>
       Array.from(
         ref.current?.querySelectorAll<HTMLElement>(
@@ -245,7 +270,8 @@ export function Modal({
     const firstField = initialTargets.find((element) =>
       element.matches("input, textarea, select"),
     );
-    (firstField || initialTargets[0] || ref.current)?.focus();
+    const preferred = initialTargets.find((element) => element.hasAttribute("data-initial-focus"));
+    (preferred || firstField || initialTargets[0] || ref.current)?.focus();
     const key = (e: KeyboardEvent) => {
       const dialogs = document.querySelectorAll<HTMLElement>(
         ".modal-backdrop .modal",
@@ -280,8 +306,7 @@ export function Modal({
     document.addEventListener("keydown", key);
     return () => {
       document.removeEventListener("keydown", key);
-      document.body.style.overflow = overflow;
-      if (shell) shell.inert = previousInert;
+      unregister();
       // The parent removes its inert state in the same commit as this dialog.
       // Restore focus after that commit so the trigger can receive it.
       window.requestAnimationFrame(() => {
@@ -297,7 +322,7 @@ export function Modal({
       }}
     >
       <div
-        className={`modal ${wide ? "wide" : ""}`}
+        className={`modal ${wide ? "wide" : ""} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -305,21 +330,25 @@ export function Modal({
         tabIndex={-1}
         ref={ref}
       >
-        <header className="modal-head">
-          <div>
-            <h2 id={titleId}>{title}</h2>
-            {subtitle && <p id={subtitleId}>{subtitle}</p>}
-          </div>
-          <button
-            className="icon-btn"
-            type="button"
-            aria-label="Pencereyi kapat"
-            disabled={closeDisabled}
-            onClick={() => close.current()}
-          >
-            <X size={20} />
-          </button>
-        </header>
+        {bare ? (
+          <h2 id={titleId} className="sr-only">{title}</h2>
+        ) : (
+          <header className="modal-head">
+            <div>
+              <h2 id={titleId}>{title}</h2>
+              {subtitle && <p id={subtitleId}>{subtitle}</p>}
+            </div>
+            <button
+              className="icon-btn"
+              type="button"
+              aria-label="Pencereyi kapat"
+              disabled={closeDisabled}
+              onClick={() => close.current()}
+            >
+              <X size={20} />
+            </button>
+          </header>
+        )}
         {children}
       </div>
     </div>,

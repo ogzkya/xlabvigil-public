@@ -14,9 +14,11 @@ export type Status = {
 };
 export type Page =
   | "home"
+  | "watchlists"
   | "entities"
   | "groups"
   | "memberships"
+  | "cases"
   | "sources"
   | "events"
   | "notifications"

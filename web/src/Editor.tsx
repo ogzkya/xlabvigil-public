@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { LoaderCircle, Save, Trash2, Info } from "lucide-react";
 import { api, ApiError } from "./api";
-import { FormError, Modal } from "./components";
+import { FormError } from "./components";
+import FormModal from "./FormModal";
 import { useAlive } from "./resource";
 import { isEntityCollection, isGroupCollection, isMembershipRecord } from "./responseShape";
 import WorkspaceRefreshNotice from "./WorkspaceRefreshNotice";
@@ -63,6 +64,7 @@ export default function Editor({
   const [entityKind, setEntityKind] = useState<EntityKind>(
     editor.kind === "entity" ? editor.value?.kind || "person" : "person",
   );
+  const [personId, setPersonId] = useState(editor.kind === "entity" ? editor.value?.personId || "" : "");
   const [startsOn, setStartsOn] = useState(
     editor.kind === "membership"
       ? editor.value?.startsOn || utcToday()
@@ -84,9 +86,6 @@ export default function Editor({
     group: "/groups",
     membership: "/memberships",
   }[editor.kind];
-  const close = () => {
-    if (!busy && !reloading) onClose();
-  };
   async function reloadCurrentRecord() {
     if (!editor.value || reloading) return;
     setReloading(true);
@@ -226,15 +225,18 @@ export default function Editor({
   }
   const value = editor.value;
   return (
-    <Modal
+    <FormModal
       title={`${title} ${value ? "düzenle" : "ekle"}`}
       subtitle={
         editor.kind === "membership"
           ? "Gerekçeli, sorumlusu ve süresi belirli inceleme üyeliği."
           : "Manuel kayıt · Kaynak doğrulaması yapılmadı"
       }
-      onClose={close}
+      onClose={onClose}
+      closeDisabled={busy || reloading}
+      hasUnsavedChanges={editor.kind === "entity" && personId !== (editor.value?.personId || "")}
     >
+      {(requestClose) => (
       <form className="editor-form" onSubmit={submit}>
         <WorkspaceRefreshNotice {...workspaceRefresh} />
         <fieldset disabled={busy}>
@@ -302,7 +304,8 @@ export default function Editor({
                   İlişkili personel
                   <select
                     name="personId"
-                    defaultValue={editor.value?.personId || ""}
+                    value={personId}
+                    onChange={(event) => setPersonId(event.target.value)}
                   >
                     <option value="">
                       İlişkilendirilmedi / paylaşılan varlık
@@ -561,7 +564,7 @@ export default function Editor({
             type="button"
             className="btn secondary"
             disabled={busy || reloading}
-            onClick={close}
+            onClick={requestClose}
           >
             Vazgeç
           </button>
@@ -575,6 +578,7 @@ export default function Editor({
           </button>
         </footer>
       </form>
-    </Modal>
+      )}
+    </FormModal>
   );
 }

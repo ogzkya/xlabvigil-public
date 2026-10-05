@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Bell,
@@ -11,6 +11,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { api, ApiError } from "./api";
+import FormModal from "./FormModal";
 import {
   Badge,
   Empty,
@@ -71,6 +72,7 @@ export default function NotificationCenter({
   onSessionExpired,
   refreshToken,
   onRefreshComplete,
+  onDataChanged,
 }: OperationsProps) {
   const alive = useAlive();
   const [cursor, setCursor] = useState("");
@@ -118,6 +120,23 @@ export default function NotificationCenter({
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
   const [detail, setDetail] = useState<Notification | null>(null);
+  const automaticRefresh = useRef(() => {});
+  automaticRefresh.current = () => {
+    if (document.visibilityState !== "visible" || busy || editing ||
+        inbox.loading || searchInvalid || searchPending) return;
+    void inbox.refresh();
+  };
+  useEffect(() => {
+    const interval = window.setInterval(() => automaticRefresh.current(), 30_000);
+    const visible = () => {
+      if (document.visibilityState === "visible") automaticRefresh.current();
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, []);
   const items = demo
     ? inbox.data?.items.filter(
         (n) =>
@@ -132,6 +151,7 @@ export default function NotificationCenter({
     try {
       await api(`/notifications/${id}/read`, "POST", {});
       if (alive.current) {
+        onDataChanged?.();
         await inbox.refresh();
         if (alive.current) setDetail(null);
       }
@@ -209,7 +229,10 @@ export default function NotificationCenter({
           E-posta ayarları kaydedilebilir; SMTP/Graph gönderim hizmeti ve harici
           mesaj kanalları henüz devrede değildir. Üst arama alanı {demo
             ? "önizleme kayıtlarında arar."
-            : "tüm bildirimlerde arar (3–120 karakter)."}
+            : "tüm bildirimlerde arar (3–120 karakter)."}{" "}
+          Bildirim kutusu görünürken 30 saniyede bir ve bu sekmeye dönünce
+          yenilenir. İşlem sürerken veya posta ayarı düzenlenirken otomatik
+          yenileme bekler.
         </p>
       </div>
       {notice && <SuccessNotice>{notice}</SuccessNotice>}
@@ -510,13 +533,14 @@ function NotificationSettings({
     }
   }
   return (
-    <Modal
+    <FormModal
       title="E-posta kanalını yapılandır"
       subtitle="Profil kaydedilir; dışarıya e-posta gönderilmez"
-      onClose={() => {
-        if (!busy) onClose();
-      }}
+      onClose={onClose}
+      closeDisabled={busy}
+      hasUnsavedChanges={host !== initial.host || port !== (initial.port || 587) || fromAddress !== initial.fromAddress || recipient !== initial.recipient || secretRef !== initial.secretRef}
     >
+      {(requestClose) => (
       <form className="editor-form" onSubmit={submit}>
         <fieldset disabled={busy}>
           <label>
@@ -663,7 +687,7 @@ function NotificationSettings({
             className="btn secondary"
             type="button"
             disabled={busy}
-            onClick={onClose}
+            onClick={requestClose}
           >
             Vazgeç
           </button>
@@ -673,6 +697,7 @@ function NotificationSettings({
           </button>
         </div>
       </form>
-    </Modal>
+      )}
+    </FormModal>
   );
 }

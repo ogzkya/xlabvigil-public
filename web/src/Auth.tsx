@@ -11,6 +11,7 @@ import { api } from "./api";
 import { isSessionResponse } from "./responseShape";
 import type { User } from "./types";
 import { Brand, FormError } from "./components";
+import { PRODUCT_VERSION } from "./productInfo";
 
 export default function Auth({
   initialized,
@@ -151,7 +152,7 @@ export default function Auth({
           Örnek çalışma alanını incele
         </button>
         <p className="auth-foot">
-          Yerel geliştirme sürümü · 0.4
+          XLab Vigil · {PRODUCT_VERSION}
           <br />
           AD ve diğer kaynak bağlantıları henüz etkin değil.
         </p>

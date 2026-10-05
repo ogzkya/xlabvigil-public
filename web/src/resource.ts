@@ -24,6 +24,7 @@ export function useResource<T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [resolvedRequest, setResolvedRequest] = useState<{
     path: string;
     demo: boolean;
@@ -43,6 +44,7 @@ export function useResource<T>(
     const { path: requestPath, demo: isDemo } = current.current;
     const ticket = ++generation.current;
     setError("");
+    setErrorStatus(null);
     setLoading(true);
     if (isDemo) {
       setData(fallback.current);
@@ -64,6 +66,7 @@ export function useResource<T>(
     } catch (err) {
       if (active()) {
         setError((err as Error).message);
+        setErrorStatus(err instanceof ApiError ? err.status : null);
         setData(null);
         setResolvedRequest({ path: requestPath, demo: isDemo });
         if (err instanceof ApiError && err.status === 401) expire.current();
@@ -82,6 +85,7 @@ export function useResource<T>(
     data,
     loading,
     error,
+    errorStatus,
     refresh,
     setData,
     matchesRequest:

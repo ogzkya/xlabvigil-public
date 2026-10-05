@@ -2,7 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { KeyRound } from "lucide-react";
 import { api, ApiError } from "./api";
-import { FormError, Modal, SuccessNotice } from "./components";
+import { FormError, SuccessNotice } from "./components";
+import FormModal from "./FormModal";
+import { useAlive } from "./resource";
 
 export default function PasswordChange({
   onSessionExpired,
@@ -16,6 +18,7 @@ export default function PasswordChange({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const alive = useAlive();
 
   function resetForm() {
     setOpen(false);
@@ -25,13 +28,9 @@ export default function PasswordChange({
     setError("");
   }
 
-  function close() {
-    if (busy) return;
-    resetForm();
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     if (newPassword !== confirmation) {
       setError("Yeni parola ve tekrar alanları eşleşmiyor.");
       return;
@@ -43,13 +42,15 @@ export default function PasswordChange({
         currentPassword,
         newPassword,
       });
+      if (!alive.current) return;
       resetForm();
       setNotice("Parolanız değiştirildi. Diğer açık oturumlar kapatıldı.");
     } catch (err) {
+      if (!alive.current) return;
       setError((err as Error).message);
       if (err instanceof ApiError && err.status === 401) onSessionExpired();
     } finally {
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
 
@@ -66,11 +67,13 @@ export default function PasswordChange({
       </button>
       {notice && <SuccessNotice appearance="inline">{notice}</SuccessNotice>}
       {open && (
-        <Modal
+        <FormModal
           title="Parolayı değiştir"
           subtitle="Bu tarayıcıdaki oturum açık kalır; diğer Vigil oturumları kapatılır."
-          onClose={close}
+          onClose={resetForm}
+          closeDisabled={busy}
         >
+          {(requestClose) => (
           <form className="editor-form" onSubmit={(event) => void submit(event)}>
             <fieldset disabled={busy}>
               <label>
@@ -112,7 +115,7 @@ export default function PasswordChange({
               {error && <FormError>{error}</FormError>}
             </fieldset>
             <div className="modal-actions">
-              <button className="btn secondary" type="button" onClick={close} disabled={busy}>
+              <button className="btn secondary" type="button" onClick={requestClose} disabled={busy}>
                 Vazgeç
               </button>
               <button className="btn primary" type="submit" disabled={busy}>
@@ -120,7 +123,8 @@ export default function PasswordChange({
               </button>
             </div>
           </form>
-        </Modal>
+          )}
+        </FormModal>
       )}
     </div>
   );

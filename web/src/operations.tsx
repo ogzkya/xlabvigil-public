@@ -4,6 +4,7 @@ import type { User } from "./types";
 import { formatTimestampUTC } from "./dateTime";
 import type { categoryLabels, Severity } from "./eventCatalog";
 
+import type { ExportResult } from "./ExportButton";
 export type OperationsProps = {
   user: User;
   demo: boolean;
@@ -11,6 +12,8 @@ export type OperationsProps = {
   onSessionExpired: () => void;
   refreshToken: number;
   onRefreshComplete: (token: number) => void;
+  onDataChanged?: () => void;
+  onExportResult?: (result: ExportResult) => void;
 };
 
 // A page refresh keeps its filters, cursor and open forms mounted. The parent

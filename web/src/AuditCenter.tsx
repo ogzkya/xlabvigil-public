@@ -5,6 +5,8 @@ import { demoWorkspace } from "./demo";
 import { useListSearch } from "./listSearch";
 import { contains, timestamp, useOperationRefresh } from "./operations";
 import { useResource } from "./resource";
+import ExportButton from "./ExportButton";
+import type { ExportResult } from "./ExportButton";
 import { isAuditPageResponse } from "./responseShape";
 import type { Audit } from "./types";
 
@@ -15,6 +17,7 @@ type AuditCenterProps = {
   onSessionExpired: () => void;
   refreshToken: number;
   onRefreshComplete: (token: number) => void;
+  onExportResult?: (result: ExportResult) => void;
 };
 const demoAuditPage: AuditPage = {
   items: demoWorkspace().audit,
@@ -43,6 +46,18 @@ const auditLabels: Record<string, string> = {
   "membership.deleted": "İnceleme üyeliği silindi",
   "membership_evidence.attached": "Olay incelemeye iliştirildi",
   "membership_evidence.retracted": "Olay bağlantısı gerekçeyle geri alındı",
+  "case.created": "İnceleme dosyası oluşturuldu",
+  "case.updated": "İnceleme dosyası güncellendi",
+  "case.noted": "İnceleme dosyasına not eklendi",
+  "case.closed": "İnceleme dosyası kapatıldı",
+  "case.reopened": "İnceleme dosyası yeniden açıldı",
+  "case_evidence.attached": "Olay dosyaya iliştirildi",
+  "case_evidence.retracted": "Dosyadaki olay bağlantısı geri alındı",
+  "events.exported": "Olaylar CSV olarak dışa aktarıldı",
+  "cases.exported": "İnceleme dosyaları CSV olarak dışa aktarıldı",
+  "audit.exported": "İşlem günlüğü CSV olarak dışa aktarıldı",
+  "entities.exported": "Varlıklar CSV olarak dışa aktarıldı",
+  "memberships.exported": "Üyelikler CSV olarak dışa aktarıldı",
 };
 
 export default function AuditCenter({
@@ -51,6 +66,7 @@ export default function AuditCenter({
   onSessionExpired,
   refreshToken,
   onRefreshComplete,
+  onExportResult,
 }: AuditCenterProps) {
   const [cursor, setCursor] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -72,6 +88,9 @@ export default function AuditCenter({
       if (contains(submittedSearch, label)) params.append("labelAction", action);
     }
   }
+  const exportParams = new URLSearchParams(params);
+  exportParams.delete("limit");
+  exportParams.delete("cursor");
   const audit = useResource<AuditPage>(
     `/audit/page?${params}`,
     demo,
@@ -106,6 +125,13 @@ export default function AuditCenter({
           Bu liste uygulama işlemleridir; kaynaklardan gelen güvenlik olayları
           değildir. Bağımsız, değiştirilemez arşiv henüz bağlı değil.
         </p>
+        <ExportButton
+          path={`/audit/export${exportParams.size ? `?${exportParams}` : ""}`}
+          demo={demo}
+          disabled={searchInvalid || searchPending}
+          onSessionExpired={onSessionExpired}
+          onResult={(result) => onExportResult?.(result)}
+        />
       </div>
       <section className="panel" aria-label="İşlem kayıtları">
         {searchInvalid ? (

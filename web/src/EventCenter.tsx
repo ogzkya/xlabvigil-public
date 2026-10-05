@@ -9,6 +9,8 @@ import {
   Upload,
 } from "lucide-react";
 import { api, ApiError } from "./api";
+import FormModal from "./FormModal";
+import ExportButton from "./ExportButton";
 import {
   Badge,
   Empty,
@@ -42,6 +44,8 @@ export default function EventCenter({
   onSessionExpired,
   refreshToken,
   onRefreshComplete,
+  onDataChanged,
+  onExportResult,
 }: OperationsProps) {
   const [severity, setSeverity] = useState("");
   const [connectionId, setConnectionId] = useState("");
@@ -75,6 +79,10 @@ export default function EventCenter({
   if (cursor) params.set("cursor", cursor);
   if (!demo && submittedSearch) params.set("q", submittedSearch);
   const eventPath = `/events?${params}`;
+  const exportParams = new URLSearchParams();
+  if (severity) exportParams.set("severity", severity);
+  if (connectionId) exportParams.set("connectionId", connectionId);
+  if (submittedSearch) exportParams.set("q", submittedSearch);
   const events = useResource<EventPage>(
     eventPath,
     demo,
@@ -125,15 +133,24 @@ export default function EventCenter({
             </p>
           </div>
         </div>
-        {user.role === "admin" && !demo && (
-          <button
-            className="btn primary"
-            disabled={sources.loading || !!sources.error}
-            onClick={() => setImporting(importConnections)}
-          >
-            <Upload size={16} /> JSON içe aktar
-          </button>
-        )}
+        <div className="page-actions">
+          <ExportButton
+            path={`/events/export${exportParams.size ? `?${exportParams}` : ""}`}
+            demo={demo}
+            disabled={searchInvalid || searchPending}
+            onSessionExpired={onSessionExpired}
+            onResult={(result) => onExportResult?.(result)}
+          />
+          {user.role === "admin" && !demo && (
+            <button
+              className="btn primary"
+              disabled={sources.loading || !!sources.error}
+              onClick={() => setImporting(importConnections)}
+            >
+              <Upload size={16} /> JSON içe aktar
+            </button>
+          )}
+        </div>
       </div>
       <div className="info-strip">
         <Info size={18} />
@@ -409,6 +426,7 @@ export default function EventCenter({
           onSessionExpired={onSessionExpired}
           onClose={() => setImporting(null)}
           onSaved={(accepted, duplicates) => {
+            onDataChanged?.();
             setImporting(null);
             setNotice(
               `${accepted} olay eklendi, ${duplicates} yinelenen kayıt atlandı.`,
@@ -478,14 +496,15 @@ function ImportEvents({
     }
   }
   return (
-    <Modal
+    <FormModal
       title="Olayları JSON ile içe aktar"
       subtitle="Normalize edilmiş olaylar · En fazla 100 kayıt"
-      onClose={() => {
-        if (!busy) onClose();
-      }}
+      onClose={onClose}
+      closeDisabled={busy}
       wide
     >
+      {(requestClose) => (
+      <>
       {connections.length ? (
         <form className="editor-form" onSubmit={submit}>
           <fieldset disabled={busy || demo}>
@@ -532,7 +551,7 @@ function ImportEvents({
               type="button"
               className="btn secondary"
               disabled={busy}
-              onClick={onClose}
+              onClick={requestClose}
             >
               Vazgeç
             </button>
@@ -554,12 +573,14 @@ function ImportEvents({
             kabul etmez.
           </Empty>
           <div className="modal-actions">
-            <button className="btn secondary" onClick={onClose}>
+            <button className="btn secondary" onClick={requestClose}>
               Kapat
             </button>
           </div>
         </div>
       )}
-    </Modal>
+      </>
+      )}
+    </FormModal>
   );
 }

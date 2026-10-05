@@ -1,0 +1,132 @@
+/* Command palette: a bare dialog with a combobox and grouped results. */
+.modal.palette {
+  width: min(640px, calc(100vw - 24px));
+  max-width: 640px;
+  align-self: flex-start;
+  margin-top: 12vh;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, 76vh);
+  background: var(--color-surface-raised);
+}
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.palette-input input,
+.palette-input input:hover {
+  border: 0;
+  padding: var(--space-6) 0;
+  font-size: var(--type-16);
+  background: transparent;
+}
+.palette-input input:focus-visible {
+  outline: none;
+}
+.palette-results {
+  overflow-y: auto;
+  padding: var(--space-6);
+  min-height: 0;
+}
+.palette-section {
+  padding: var(--space-10) var(--space-10) var(--space-4);
+  font-size: var(--type-12);
+  font-weight: var(--weight-600);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+.palette-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-8) var(--space-10);
+  border-radius: var(--radius-7);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+.palette-option.active {
+  background: var(--color-surface-selected);
+  color: var(--color-selected-foreground);
+}
+.palette-option > svg {
+  color: var(--color-text-subtle);
+  flex-shrink: 0;
+}
+.palette-icon {
+  display: inline-flex;
+  padding: var(--space-5);
+  border-radius: var(--radius-6);
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+}
+.palette-option.active .palette-icon {
+  background: var(--color-surface);
+  color: var(--color-accent);
+}
+.palette-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.palette-label strong {
+  font-size: var(--type-13);
+  font-weight: var(--weight-550);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-label small {
+  font-size: var(--type-12);
+  color: var(--color-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-empty {
+  padding: var(--space-24) var(--space-16);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--type-13);
+}
+.palette-footer {
+  display: flex;
+  gap: var(--space-16);
+  padding: var(--space-8) var(--space-16);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-subtle);
+  font-size: var(--type-12);
+}
+.palette-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.toast.error {
+  background: var(--color-form-error-background);
+  color: var(--color-form-error-foreground);
+  border-color: var(--color-form-error-border);
+}
+@media (max-width: 760px) {
+  .palette-trigger-text,
+  .palette-trigger kbd {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .palette-footer {
+    display: none;
+  }
+  .modal.palette {
+    margin-top: var(--space-12);
+  }
+}

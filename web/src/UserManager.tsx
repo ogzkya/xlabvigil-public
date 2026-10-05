@@ -13,6 +13,7 @@ import {
   SuccessNotice,
 } from "./components";
 import { formatDateUTC } from "./dateTime";
+import FormModal from "./FormModal";
 import { accountSessionStatusTone } from "./design";
 import { useOperationRefresh } from "./operations";
 import { useAlive, useResource } from "./resource";
@@ -218,10 +219,12 @@ function RevokeSessionsDialog({
   onSaved: (message: string) => Promise<void>;
   onSessionExpired: () => void;
 }) {
+  const alive = useAlive();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function revoke() {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -230,15 +233,17 @@ function RevokeSessionsDialog({
         "POST",
         {},
       );
+      if (!alive.current) return;
       const message = result.revoked
         ? `${user.name} için ${result.revoked} oturum kapatıldı.`
         : `${user.name} için açık oturum kaydı bulunmadı.`;
       await onSaved(message);
     } catch (err) {
+      if (!alive.current) return;
       setError((err as Error).message);
       if (err instanceof ApiError && err.status === 401) onSessionExpired();
     } finally {
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
 
@@ -249,6 +254,7 @@ function RevokeSessionsDialog({
       onClose={() => {
         if (!busy) onClose();
       }}
+      closeDisabled={busy}
     >
       <div className="detail-body">
         <p>
@@ -348,6 +354,7 @@ function UserDialog({
     try {
       if (draft.mode === "create") {
         await api<ManagedUser>("/users", "POST", { username, name, password, role });
+        if (!alive.current) return;
         await onSaved("Kullanıcı oluşturuldu.");
       } else {
         const updated = await api<ManagedUser>(`/users/${draft.user.id}`, "PATCH", {
@@ -356,11 +363,13 @@ function UserDialog({
           active,
           expectedVersion,
         });
+        if (!alive.current) return;
         const previous = baselineRecord ?? draft.user;
         const accessChanged = updated.role !== previous.role || updated.active !== previous.active;
         await onSaved(accessChanged ? "Kullanıcı güncellendi; açık oturumları iptal edildi." : "Kullanıcı bilgileri güncellendi.");
       }
     } catch (err) {
+      if (!alive.current) return;
       if (err instanceof ApiError && err.code === "stale_write") {
         setConflict(true);
         setCurrentRecord(null);
@@ -370,16 +379,18 @@ function UserDialog({
       setError((err as Error).message);
       if (err instanceof ApiError && err.status === 401) onSessionExpired();
     } finally {
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
 
   return (
-    <Modal
+    <FormModal
       title={existing ? "Kullanıcıyı düzenle" : "Kullanıcı oluştur"}
       subtitle={existing ? `${existing.username} · sürüm ${expectedVersion}` : "Yeni yerel Vigil hesabı"}
-      onClose={() => { if (!busy && !reloading) onClose(); }}
+      onClose={onClose}
+      closeDisabled={busy || reloading}
     >
+      {(requestClose) => (
       <form className="editor-form" onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy}>
           {draft.mode === "create" && (
@@ -475,12 +486,13 @@ function UserDialog({
           )}
         </fieldset>
         <div className="modal-actions">
-          <button className="btn secondary" type="button" onClick={onClose} disabled={busy || reloading}>Vazgeç</button>
+          <button className="btn secondary" type="button" onClick={requestClose} disabled={busy || reloading}>Vazgeç</button>
           <button className="btn primary" type="submit" disabled={busy || conflict || reloading}>
             <UserRound size={16} /> {busy ? "Kaydediliyor…" : existing ? "Değişiklikleri kaydet" : "Kullanıcı oluştur"}
           </button>
         </div>
       </form>
-    </Modal>
+      )}
+    </FormModal>
   );
 }

@@ -6,22 +6,25 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   ArrowRight,
   Bell,
   CalendarClock,
   ChevronRight,
   ClipboardList,
-  Database,
+  Command,
   FileClock,
   Fingerprint,
   FolderKanban,
   Info,
+  Layers,
   LayoutDashboard,
   LogOut,
   Menu,
   Monitor,
+  MonitorCog,
+  Moon,
   Network,
   Pencil,
   Plus,
@@ -33,12 +36,15 @@ import {
   ShieldAlert,
   Siren,
   SlidersHorizontal,
+  Sun,
+  UserCog,
   UserRound,
   Users,
   X,
 } from "lucide-react";
 import { api, ApiError } from "./api";
 import Auth from "./Auth";
+import { PRODUCT_VERSION } from "./productInfo";
 import AccountCenter from "./AccountCenter";
 import CandidateEvents from "./CandidateEvents";
 import EvidencePanel from "./EvidencePanel";
@@ -60,6 +66,19 @@ import EventCenter from "./EventCenter";
 import NotificationCenter from "./NotificationCenter";
 import UserManager from "./UserManager";
 import AuditCenter from "./AuditCenter";
+import CaseCenter from "./CaseCenter";
+import WorkingGuide from "./WorkingGuide";
+import WatchlistCenter from "./WatchlistCenter";
+import Dashboard from "./Dashboard";
+import CommandPalette from "./CommandPalette";
+import type { PaletteServerSearch } from "./CommandPalette";
+import ExportButton from "./ExportButton";
+import type { ExportResult } from "./ExportButton";
+import { nextThemePreference, themeLabels, useTheme } from "./theme";
+import HeaderWarnings from "./HeaderWarnings";
+import type { ReviewAlertFilter, WatchlistEntry } from "./watchlists";
+import { nextWatchlistEntryIntent } from "./watchlistNavigation";
+import type { WatchlistEntryIntent } from "./watchlistNavigation";
 import {
   Avatar,
   Badge,
@@ -70,7 +89,6 @@ import {
   Loading,
   Modal,
 } from "./components";
-import { accountSessionStatusTone } from "./design";
 import { demoUser, demoWorkspace } from "./demo";
 import { MAX_LIST_SEARCH_LENGTH } from "./listSearch";
 import {
@@ -99,63 +117,83 @@ const pages: Record<
   { title: string; subtitle: string; icon: typeof Shield }
 > = {
   home: {
-    title: "Genel görünüm",
-    subtitle: "Kurumsal varlıklar ve gerekçeli incelemeler için ortak görünüm.",
+    title: "Pano",
+    subtitle: "İnceleme önceliği, takvim ve olay özeti tek bakışta.",
     icon: LayoutDashboard,
   },
+  watchlists: {
+    title: "Listeler ve uyarılar",
+    subtitle: "Kırmızı ve sarı listeler, gerekçeler ve inceleme uyarıları.",
+    icon: ShieldAlert,
+  },
   entities: {
-    title: "Varlıklar ve ilişkiler",
-    subtitle:
-      "Personel, hesap, cihaz, servis ve uygulamaları bir araya getirin.",
+    title: "Varlıklar",
+    subtitle: "Personel, hesap, cihaz, servis ve uygulama kayıtları.",
     icon: Users,
   },
   groups: {
     title: "İzleme grupları",
-    subtitle: "Kapsamı belirli gruplarla inceleme önceliklerini düzenleyin.",
-    icon: ShieldAlert,
+    subtitle: "İnceleme önceliği ve kapsamı belirli gruplar.",
+    icon: Layers,
   },
   memberships: {
     title: "İnceleme üyelikleri",
-    subtitle: "Gerekçe, sorumlu, süre ve geçmişiyle tüm grup üyelikleri.",
+    subtitle: "Gerekçe, sorumlu, süre ve geçmişiyle grup üyelikleri.",
     icon: ClipboardList,
+  },
+  cases: {
+    title: "İnceleme dosyaları",
+    subtitle: "Olay referansları, notlar ve gerekçeli kararlar.",
+    icon: FolderKanban,
   },
   sources: {
     title: "Veri kaynakları",
-    subtitle: "LDAP, Palo Alto, Logsign ve Trend Micro bağlantılarını yönetin.",
+    subtitle: "LDAP/AD, Windows, Palo Alto, Logsign ve Trend Micro profilleri.",
     icon: Network,
   },
   events: {
     title: "Güvenlik olayları",
-    subtitle:
-      "Kaynak, önem derecesi ve kimlik bağlamıyla kurumsal olayları inceleyin.",
+    subtitle: "Aktarılmış olaylar; kaynak, önem ve kimlik bağlamıyla.",
     icon: Siren,
   },
   notifications: {
-    title: "Bildirimler ve mesajlar",
-    subtitle: "İnceleme bildirimleri ve e-posta gönderim yapılandırması.",
+    title: "Bildirimler",
+    subtitle: "Yüksek ve kritik olay bildirimleri, e-posta profili.",
     icon: Bell,
   },
   audit: {
     title: "İşlem günlüğü",
-    subtitle: "Vigil içerisinde gerçekleştirilen yönetim işlemleri.",
+    subtitle: "Vigil içinde yapılan yönetim işlemleri.",
     icon: FileClock,
   },
   users: {
-    title: "Kullanıcı yönetimi",
-    subtitle: "Yerel hesapların rollerini ve etkinliğini yönetin.",
-    icon: Users,
+    title: "Kullanıcılar",
+    subtitle: "Yerel hesaplar, roller ve oturumlar.",
+    icon: UserCog,
   },
   account: {
     title: "Hesabım",
-    subtitle: "Yerel hesap bilgilerinizi ve oturum güvenliğini yönetin.",
+    subtitle: "Parola ve oturum güvenliği.",
     icon: Fingerprint,
   },
   settings: {
-    title: "Çalışma alanı",
-    subtitle: "Ürün kapsamı, erişim ve bağlantı durumu.",
+    title: "Çalışma rehberi",
+    subtitle: "Çalışma sırası, roller ve veri akışı.",
     icon: Settings,
   },
 };
+const navSections: { label: string; pages: Page[] }[] = [
+  { label: "İzleme", pages: ["home", "watchlists", "memberships", "cases"] },
+  { label: "Kayıtlar", pages: ["entities", "groups"] },
+  { label: "Operasyon", pages: ["events", "sources", "notifications"] },
+  { label: "Yönetim", pages: ["audit", "users", "account", "settings"] },
+];
+const paletteSearchTargets: { page: PaletteServerSearch; label: string }[] = [
+  { page: "events", label: "Olaylarda ara" },
+  { page: "cases", label: "Dosyalarda ara" },
+  { page: "notifications", label: "Bildirimlerde ara" },
+  { page: "audit", label: "İşlem günlüğünde ara" },
+];
 const kindIcons = {
   person: UserRound,
   account: Fingerprint,
@@ -208,6 +246,13 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeTone, setNoticeTone] = useState<"success" | "error">("success");
+  const notify = useCallback((message: string, tone: "success" | "error" = "success") => {
+    setNoticeTone(tone);
+    setNotice(message);
+  }, []);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const theme = useTheme();
   const [page, setPage] = useState<Page>(initialPage);
   const [query, setQuery] = useState("");
   const [entityFilter, setEntityFilter] = useState("all");
@@ -217,6 +262,13 @@ export default function App() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [entityDetail, setEntityDetail] = useState<Entity | null>(null);
   const [memberDetail, setMemberDetail] = useState<Membership | null>(null);
+  const [memberDetailContext, setMemberDetailContext] = useState<Workspace | null>(null);
+  const [watchlistRevision, setWatchlistRevision] = useState(0);
+  const [watchlistEntryIntent, setWatchlistEntryIntent] =
+    useState<WatchlistEntryIntent | null>(null);
+  const warningsChanged = useCallback(() => {
+    setWatchlistRevision((value) => value + 1);
+  }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [operationsRefresh, setOperationsRefresh] = useState(0);
   const [operationsRefreshing, setOperationsRefreshing] = useState(false);
@@ -232,10 +284,15 @@ export default function App() {
   const [loggingOut, setLoggingOut] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const mobileFocusReturnPending = useRef(false);
+  const mainContentRef = useRef<HTMLElement>(null);
+  const pageHeadingId = useId();
   const requestGeneration = useRef(0);
   const pendingEntryScroll = useRef(false);
   const allowed = !!user && (user.role === "admin" || user.role === "analyst");
   const operationsPage =
+    page === "watchlists" ||
+    page === "cases" ||
     page === "sources" ||
     page === "events" ||
     page === "notifications" ||
@@ -249,10 +306,12 @@ export default function App() {
       ? operationsRefresh
       : 0;
   const serverSearchPage =
-    page === "events" || page === "notifications" || page === "audit";
+    page === "cases" || page === "events" || page === "notifications" || page === "audit";
   // HTML maxLength counts UTF-16 units; the shared search limit counts code points.
   const searchPrompt =
-    page === "events"
+    page === "cases"
+      ? "Tüm inceleme dosyalarında ara"
+      : page === "events"
       ? "Tüm olaylarda ara"
       : page === "notifications"
         ? "Tüm bildirimlerde ara"
@@ -270,11 +329,14 @@ export default function App() {
     setEditor(null);
     setEntityDetail(null);
     setMemberDetail(null);
+    setMemberDetailContext(null);
+    setWatchlistEntryIntent(null);
     setLoading(false);
     setError("");
     setMobileOpen(false);
-    setNotice("Oturumunuz sona erdi. Yeniden giriş yapın.");
-  }, []);
+    setPaletteOpen(false);
+    notify("Oturumunuz sona erdi. Yeniden giriş yapın.", "error");
+  }, [notify]);
   const operationsRefreshComplete = useCallback((token: number) => {
     const pending = pendingOperationsRefresh.current;
     const current = refreshIdentity.current;
@@ -416,35 +478,108 @@ export default function App() {
   }, [user, allowed, demo, refresh, workspace]);
   useEffect(() => {
     const change = () => {
-      setPage(initialPage());
+      const next = initialPage();
+      setPage(next);
+      if (next !== "watchlists") setWatchlistEntryIntent(null);
       setQuery("");
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key.toLocaleLowerCase("en") !== "k" || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (!user) return;
+      const dialogOpen = !!document.querySelector(".modal-backdrop");
+      if (dialogOpen && !paletteOpen) return;
+      event.preventDefault();
+      if (!mobileOpen) setPaletteOpen((open) => !open);
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [user, paletteOpen, mobileOpen]);
+  useEffect(() => {
     if (!notice) return;
     const timeout = window.setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(timeout);
   }, [notice]);
-  useEffect(() => {
-    if (!mobileOpen) return;
+  useLayoutEffect(() => {
+    if (!mobileOpen) {
+      if (!mobileFocusReturnPending.current) return;
+      mobileFocusReturnPending.current = false;
+      let disposed = false;
+      const restoreMenuFocus = () => {
+        const menu = menuRef.current;
+        const active = document.activeElement;
+        if (!menu || disposed || !menu.isConnected || menu.closest("[inert]"))
+          return;
+        const bounds = menu.getBoundingClientRect();
+        if (
+          bounds.width > 0 && bounds.height > 0 &&
+          window.getComputedStyle(menu).visibility === "visible" &&
+          (active === null || active === document.body || sidebarRef.current?.contains(active))
+        ) menu.focus({ preventScroll: true });
+      };
+      // Restore after the closed DOM has removed inert, then cover focus fixup
+      // when a rapid close interrupts the drawer's visibility transition.
+      restoreMenuFocus();
+      const returnFrame = window.requestAnimationFrame(restoreMenuFocus);
+      const returnTimer = window.setTimeout(restoreMenuFocus, 250);
+      return () => {
+        disposed = true;
+        window.cancelAnimationFrame(returnFrame);
+        window.clearTimeout(returnTimer);
+      };
+    }
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    let disposed = false;
+    const sidebar = sidebarRef.current;
     const focusables = () =>
       Array.from(
         sidebarRef.current?.querySelectorAll<HTMLButtonElement>(
           "button:not([disabled])",
         ) || [],
-      ).filter((el) => el.offsetParent !== null);
-    focusables()[0]?.focus();
+      ).filter((el) => {
+        const bounds = el.getBoundingClientRect();
+        return bounds.width > 0 && bounds.height > 0 &&
+          window.getComputedStyle(el).visibility === "visible" &&
+          !el.closest("[inert]");
+      });
+    const focusFirst = () => {
+      if (!disposed && !sidebarRef.current?.contains(document.activeElement))
+        focusables()[0]?.focus({ preventScroll: true });
+    };
+    focusFirst();
+    let initialFocusFrame = window.requestAnimationFrame(() => {
+      focusFirst();
+      // Retry only when the opening commit still has no focus in the drawer.
+      if (!sidebarRef.current?.contains(document.activeElement))
+        initialFocusFrame = window.requestAnimationFrame(focusFirst);
+    });
+    const settled = (event: TransitionEvent) => {
+      if (
+        !disposed && event.target === sidebar &&
+        (event.propertyName === "transform" || event.propertyName === "visibility")
+      ) {
+        window.cancelAnimationFrame(initialFocusFrame);
+        initialFocusFrame = window.requestAnimationFrame(focusFirst);
+      }
+    };
+    sidebar?.addEventListener("transitionend", settled);
+    const settledFocusTimer = window.setTimeout(focusFirst, 250);
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMobileOpen(false);
       if (e.key === "Tab") {
         const list = focusables(),
           first = list[0],
           last = list.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
+        if (!first || !last) {
+          e.preventDefault();
+        } else if (!list.includes(document.activeElement as HTMLButtonElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last?.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
@@ -459,10 +594,14 @@ export default function App() {
     document.addEventListener("keydown", key);
     window.addEventListener("resize", resize);
     return () => {
+      mobileFocusReturnPending.current = true;
+      disposed = true;
+      window.cancelAnimationFrame(initialFocusFrame);
+      window.clearTimeout(settledFocusTimer);
+      sidebar?.removeEventListener("transitionend", settled);
       document.body.style.overflow = overflow;
       document.removeEventListener("keydown", key);
       window.removeEventListener("resize", resize);
-      menuRef.current?.focus();
     };
   }, [mobileOpen]);
 
@@ -472,9 +611,24 @@ export default function App() {
       setOperationsRefreshing(false);
     }
     setPage(next);
+    if (next !== "watchlists") setWatchlistEntryIntent(null);
     setQuery("");
     setMobileOpen(false);
     window.history.replaceState(null, "", `#${next}`);
+  }
+  function skipToContent(event: ReactMouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    const target = mainContentRef.current;
+    if (!target || target.closest("[inert]")) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start", behavior: "instant" });
+  }
+  function openReviewAlerts(alertKind: ReviewAlertFilter) {
+    if (!allowed) return;
+    setWatchlistEntryIntent((current) =>
+      nextWatchlistEntryIntent(current, alertKind),
+    );
+    navigate("watchlists");
   }
   function startDemo() {
     pendingEntryScroll.current = true;
@@ -495,7 +649,7 @@ export default function App() {
       try {
         await api("/logout", "POST", {});
       } catch (e) {
-        setNotice((e as Error).message);
+        notify((e as Error).message, "error");
         setLoggingOut(false);
         return;
       }
@@ -510,6 +664,7 @@ export default function App() {
     setEntityDetail(null);
     setMemberDetail(null);
     setLoggingOut(false);
+    setMemberDetailContext(null);
     navigate("home");
     void boot();
   }
@@ -517,7 +672,9 @@ export default function App() {
     setEditor(null);
     setEntityDetail(null);
     setMemberDetail(null);
-    setNotice("Değişiklik kaydedildi.");
+    setMemberDetailContext(null);
+    setWatchlistRevision((value) => value + 1);
+    notify("Değişiklik kaydedildi.");
     void refresh();
   }
   function membershipChanged(updated: Membership) {
@@ -537,9 +694,21 @@ export default function App() {
         ? updated
         : current,
     );
+    setMemberDetailContext((current) => current ? {
+      ...current,
+      memberships: current.memberships.map((item) => item.id === updated.id ? updated : item),
+    } : current);
+    setWatchlistRevision((value) => value + 1);
     // A targeted membership read cannot certify the rest of the workspace.
     // Reload every collection while keeping the modal and its drafts mounted.
     void refresh();
+  }
+  function openWatchlistMembership(entry: WatchlistEntry) {
+    setMemberDetailContext({
+      entities: [entry.entity], groups: [entry.group],
+      memberships: [entry.membership], audit: [],
+    });
+    setMemberDetail(entry.membership);
   }
   function openGroup(group: Group) {
     setGroupFilter(group.id);
@@ -553,6 +722,9 @@ export default function App() {
     navigate("memberships");
   }
   const editable = allowed && !demo && !loading && !error;
+  const detailWorkspace = memberDetailContext?.memberships.some((item) => item.id === memberDetail?.id)
+    ? memberDetailContext
+    : workspace;
   const newButton = (kind: EditorState["kind"], label: string) =>
     editable ? (
       <button
@@ -602,7 +774,7 @@ export default function App() {
           onDemo={startDemo}
         />
         {notice && (
-          <div className="toast" role="status">
+          <div className={`toast ${noticeTone}`} role="status">
             {notice}
           </div>
         )}
@@ -610,6 +782,14 @@ export default function App() {
     );
 
   const heading = pages[page];
+  const visiblePage = (p: Page) =>
+    (allowed || p === "account" || p === "settings") &&
+    (p !== "audit" || user.role === "admin") &&
+    (p !== "users" || (!demo && user.role === "admin"));
+  const exportResult = (result: ExportResult) =>
+    result.ok
+      ? notify(`${result.fileName} indirildi; işlem günlüğüne kaydedildi.`)
+      : notify(result.message, "error");
   const today = utcToday();
   const workspaceRefresh: WorkspaceRefreshState = {
     loading,
@@ -621,12 +801,6 @@ export default function App() {
   const dueMemberships = (workspace?.memberships || []).filter(
     (m) => reviewNeedsAttention(classifyMembershipReview(m, today)),
   ).sort(compareMembershipReview);
-  const upcomingMemberships = (workspace?.memberships || []).filter(
-    (m) => classifyMembershipReview(m, today) === "upcoming",
-  );
-  const highPriority = activeMemberships.filter(
-    (m) => workspace?.groups.find((g) => g.id === m.groupId)?.color === "red",
-  );
   const entities =
     workspace?.entities.filter(
       (e) =>
@@ -721,7 +895,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <a href="#main-content" className="skip-link">
+      <a href="#main-content" className="skip-link" onClick={skipToContent}>
         İçeriğe geç
       </a>
       {mobileOpen && (
@@ -747,53 +921,53 @@ export default function App() {
             <X size={20} />
           </button>
         </div>
-        <div className="workspace-chip">
-          <Shield size={17} />
-          <div>
-            <strong>Kurum güvenliği</strong>
-            <small>
-              {demo ? "Kurgusal örnek alan" : "Yerel çalışma alanı"}
-            </small>
-          </div>
-          <span className="version-chip">0.4</span>
-        </div>
+        <button
+          className="palette-nav-trigger"
+          type="button"
+          onClick={() => {
+            setMobileOpen(false);
+            setPaletteOpen(true);
+          }}
+        >
+          <Search size={15} />
+          <span>Ara veya git…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
         <nav aria-label="Modüller">
-          <p className="nav-label">GÜVENLİK ÇALIŞMA ALANI</p>
-          {navPages
-            .filter(
-              (p) =>
-                (p !== "audit" || user.role === "admin") &&
-                (p !== "users" || (!demo && user.role === "admin")),
-            )
-            .map((p) => {
-              const Icon = pages[p].icon;
-              return (
-                <button
-                  key={p}
-                  className={`nav-item ${page === p ? "active" : ""}`}
-                  aria-current={page === p ? "page" : undefined}
-                  onClick={() => navigate(p)}
-                >
-                  <Icon size={19} />
-                  {p === "entities" ? "Varlıklar ve ilişkiler" : pages[p].title}
-                  {p === "memberships" &&
-                    !loading && !error && !!dueMemberships.length &&
-                    !error &&
-                    !loading && (
-                      <span className="nav-count">{dueMemberships.length}</span>
-                    )}
-                </button>
-              );
-            })}
+          {navSections.map((section) => {
+            const items = section.pages.filter(visiblePage);
+            if (!items.length) return null;
+            return (
+              <div className="nav-section" key={section.label}>
+                <p className="nav-label">{section.label}</p>
+                {items.map((p) => {
+                  const Icon = pages[p].icon;
+                  return (
+                    <button
+                      key={p}
+                      className={`nav-item ${page === p ? "active" : ""}`}
+                      aria-current={page === p ? "page" : undefined}
+                      onClick={() => navigate(p)}
+                    >
+                      <Icon size={17} />
+                      {pages[p].title}
+                      {p === "memberships" && !loading && !error && !!dueMemberships.length && (
+                        <span className="nav-count" aria-label={`${dueMemberships.length} işlem bekleyen inceleme`}>
+                          {dueMemberships.length}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-security">
-            <Network size={18} />
-            <div>
-              <strong>Canlı toplama kapalı</strong>
-              <span>Yapılandırma ve manuel olay aktarımı</span>
-            </div>
-          </div>
+          <p className="sidebar-meta">
+            <span aria-hidden="true" />
+            {demo ? "Kurgusal örnek" : "Yerel çalışma alanı"} · {PRODUCT_VERSION} · Canlı toplama kapalı
+          </p>
           <div className="sidebar-user">
             <Avatar name={user.name} small />
             <div>
@@ -833,38 +1007,65 @@ export default function App() {
             <ChevronRight size={14} />
             <strong>{heading.title}</strong>
           </div>
-          <label className="global-search">
-            <Search size={17} />
-            <span className="sr-only">{searchPrompt}</span>
-            <input
-              value={query}
-              maxLength={
-                serverSearchPage ? MAX_LIST_SEARCH_LENGTH * 2 : undefined
-              }
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (page === "home") {
-                  setPage("entities");
-                  window.history.replaceState(null, "", "#entities");
+          {page !== "settings" && page !== "watchlists" && page !== "home" && page !== "account" ? (
+            <label className="global-search">
+              <Search size={16} />
+              <span className="sr-only">{searchPrompt}</span>
+              <input
+                aria-label={searchPrompt}
+                value={query}
+                maxLength={
+                  serverSearchPage ? MAX_LIST_SEARCH_LENGTH * 2 : undefined
                 }
-              }}
-              placeholder={searchPrompt}
-              disabled={page === "settings" || !allowed}
-            />
-            {query && (
-              <button
-                className="icon-btn"
-                onClick={() => setQuery("")}
-                aria-label="Aramayı temizle"
-              >
-                <X size={14} />
-              </button>
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPrompt}
+                disabled={!allowed}
+              />
+              {query && (
+                <button
+                  className="icon-btn"
+                  onClick={() => setQuery("")}
+                  aria-label="Aramayı temizle"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+          ) : (
+            <span className="topbar-spacer" />
+          )}
+          <div className="topbar-tools">
+            <button
+              className="palette-trigger"
+              type="button"
+              aria-label="Komut paletini aç (Ctrl+K)"
+              onClick={() => setPaletteOpen(true)}
+            >
+              <Command size={15} />
+              <span className="palette-trigger-text">Komutlar</span>
+              <kbd>Ctrl K</kbd>
+            </button>
+            {allowed && (
+              <HeaderWarnings
+                key={`${user.id}-${demo}`}
+                demo={demo}
+                demoWorkspace={demo ? workspace ?? demoWorkspace() : { entities: [], groups: [], memberships: [], audit: [] }}
+                revision={watchlistRevision}
+                onNavigate={navigate}
+                onOpenReviewAlerts={openReviewAlerts}
+                onSessionExpired={sessionExpired}
+              />
             )}
-          </label>
-          <span className="top-mode">
-            <span />
-            Yerel sürüm
-          </span>
+            <button
+              className="icon-btn theme-toggle"
+              type="button"
+              aria-label={`${themeLabels[theme.preference]} etkin. ${themeLabels[nextThemePreference(theme.preference)]} seçmek için tıklayın.`}
+              title={themeLabels[theme.preference]}
+              onClick={() => theme.choose(nextThemePreference(theme.preference))}
+            >
+              {theme.preference === "dark" ? <Moon size={16} /> : theme.preference === "light" ? <Sun size={16} /> : <MonitorCog size={16} />}
+            </button>
+          </div>
         </header>
         {demo && (
           <div className="demo-banner">
@@ -881,23 +1082,36 @@ export default function App() {
             </button>
           </div>
         )}
-        <main className="main-content" id="main-content" tabIndex={-1}>
-          <div className="date-line">
-            <span>KURUMSAL TEHDİT VE RİSK İNCELEMESİ</span>
-            <span>
-              {new Date().toLocaleDateString("tr-TR", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-                timeZone: "UTC",
-              })} · UTC
-            </span>
-          </div>
+        <main
+          className="main-content"
+          id="main-content"
+          tabIndex={-1}
+          ref={mainContentRef}
+          aria-labelledby={pageHeadingId}
+        >
           <div className="page-heading">
             <div>
-              <h1>{heading.title}</h1>
+              <span className="page-meta">
+                {new Date().toLocaleDateString("tr-TR", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  timeZone: "UTC",
+                })} · UTC
+              </span>
+              <h1 id={pageHeadingId}>{heading.title}</h1>
               <p>{heading.subtitle}</p>
             </div>
+            <div className="page-actions">
+            {allowed && (page === "entities" || page === "memberships") && (
+              <ExportButton
+                path={page === "entities" ? "/entities/export" : "/memberships/export"}
+                demo={demo}
+                disabled={!workspace || loading || !!error}
+                onSessionExpired={sessionExpired}
+                onResult={exportResult}
+              />
+            )}
             {page === "entities" ? (
               newButton("entity", "Varlık ekle")
             ) : page === "groups" ? (
@@ -906,7 +1120,7 @@ export default function App() {
               workspace?.entities.length &&
               workspace?.groups.length ? (
               newButton("membership", "Üyelik ekle")
-            ) : allowed && !demo && page !== "account" ? (
+            ) : allowed && !demo && page !== "account" && page !== "settings" ? (
               <button
                 className="btn secondary"
                 disabled={operationsPage ? operationsRefreshing : loading}
@@ -938,6 +1152,7 @@ export default function App() {
                   : "Yenile"}
               </button>
             ) : null}
+            </div>
           </div>
           {page === "account" ? (
             <AccountCenter
@@ -945,11 +1160,36 @@ export default function App() {
               demo={demo}
               onSessionExpired={sessionExpired}
             />
+          ) : page === "settings" ? (
+            <WorkingGuide user={user} demo={demo} status={status} onNavigate={navigate} />
           ) : !allowed ? (
             <Empty title="Bu alan için erişiminiz yok">
               Vigil inceleme verilerine yalnızca yönetici ve analist rolleri
               erişebilir. Oturum rolünüz: {roleLabels[user.role]}.
             </Empty>
+          ) : page === "watchlists" ? (
+            <WatchlistCenter
+              key={`${user.id}-${demo}`}
+              demo={demo}
+              demoWorkspace={demo ? workspace ?? demoWorkspace() : { entities: [], groups: [], memberships: [], audit: [] }}
+              onOpenMembership={openWatchlistMembership}
+              onNavigate={navigate}
+              onSessionExpired={sessionExpired}
+              refreshToken={operationsRefreshToken}
+              onRefreshComplete={operationsRefreshComplete}
+              revision={watchlistRevision}
+              entryIntent={watchlistEntryIntent}
+            />
+          ) : page === "cases" ? (
+            <CaseCenter
+              key={`${user.id}-${demo}`}
+              demo={demo}
+              query={query}
+              onSessionExpired={sessionExpired}
+              refreshToken={operationsRefreshToken}
+              onRefreshComplete={operationsRefreshComplete}
+                onExportResult={exportResult}
+            />
           ) : page === "sources" ? (
             <SourceManager
               key={`${user.id}-${demo}`}
@@ -969,6 +1209,8 @@ export default function App() {
               onSessionExpired={sessionExpired}
               refreshToken={operationsRefreshToken}
               onRefreshComplete={operationsRefreshComplete}
+                onExportResult={exportResult}
+              onDataChanged={warningsChanged}
             />
           ) : page === "notifications" ? (
             <NotificationCenter
@@ -979,6 +1221,7 @@ export default function App() {
               onSessionExpired={sessionExpired}
               refreshToken={operationsRefreshToken}
               onRefreshComplete={operationsRefreshComplete}
+              onDataChanged={warningsChanged}
             />
           ) : page === "audit" ? (
             user.role === "admin" ? (
@@ -989,6 +1232,7 @@ export default function App() {
                 onSessionExpired={sessionExpired}
                 refreshToken={operationsRefreshToken}
                 onRefreshComplete={operationsRefreshComplete}
+                onExportResult={exportResult}
               />
             ) : (
               <Empty title="Yönetici yetkisi gerekir">
@@ -1021,244 +1265,23 @@ export default function App() {
           ) : workspace ? (
             <>
               {page === "home" && (
-                <>
-                  <div className="stats-grid">
-                    <Stat
-                      label="Kayıtlı varlık"
-                      value={workspace.entities.length}
-                      foot="Manuel, doğrulama bekliyor"
-                      icon={<Users size={22} />}
-                      onClick={() => navigate("entities")}
-                    />
-                    <Stat
-                      label="Etkin üyelik"
-                      value={activeMemberships.length}
-                      foot="Bir varlık birden çok grupta olabilir"
-                      icon={<Shield size={22} />}
-                      onClick={() => {
-                        setMembershipFilter("active");
-                        setGroupFilter("");
-                        navigate("memberships");
-                      }}
-                    />
-                    <Stat
-                      label="Kırmızı öncelik"
-                      value={highPriority.length}
-                      foot="İnceleme üyeliği sayısı"
-                      icon={<ShieldAlert size={22} />}
-                      tone="red"
-                      onClick={() => navigate("groups")}
-                    />
-                    <Stat
-                      label="Gözden geçirme"
-                      value={dueMemberships.length}
-                      foot="Tarihi gelen ve süresi dolan açık kayıtlar"
-                      icon={<CalendarClock size={22} />}
-                      tone="yellow"
-                      onClick={() => openReviewQueue()}
-                    />
-                  </div>
-                  <div className="dashboard-columns">
-                    <div className="dashboard-main">
-                      <section className="intro-card">
-                        <div>
-                          <span className="intro-kicker">
-                            <span />
-                            İLİŞKİLENDİR · İNCELE · KAYDA AL
-                          </span>
-                          <h2>
-                            Her incelemenin
-                            <br />
-                            bir bağlamı olsun.
-                          </h2>
-                          <p>
-                            Varlıkları ilişkilendirin. Gerekçeyi ve sorumluyu
-                            belirleyin.
-                            <br className="desktop-break" />
-                            İncelemelerin süresini ve geçmişini birlikte takip
-                            edin.
-                          </p>
-                          <button onClick={() => navigate("groups")}>
-                            İzleme gruplarını aç
-                            <ArrowRight size={16} />
-                          </button>
-                        </div>
-                        <div className="vigil-art" aria-hidden="true">
-                          <div className="radar-ring r1" />
-                          <div className="radar-ring r2" />
-                          <div className="radar-ring r3" />
-                          <div className="radar-core">
-                            <Shield size={40} />
-                          </div>
-                          <span className="radar-node n1">
-                            <UserRound size={21} />
-                          </span>
-                          <span className="radar-node n2">
-                            <Fingerprint size={21} />
-                          </span>
-                          <span className="radar-node n3">
-                            <Monitor size={21} />
-                          </span>
-                        </div>
-                      </section>
-                      <div className="section-heading">
-                        <h2>İzleme grupları</h2>
-                        <button
-                          className="link-btn"
-                          onClick={() => navigate("groups")}
-                        >
-                          Tüm gruplar
-                          <ArrowRight size={15} />
-                        </button>
-                      </div>
-                      {workspace.groups.length ? (
-                        <div className="group-grid home-groups">
-                          {workspace.groups.slice(0, 4).map((g) => (
-                            <GroupCard
-                              key={g.id}
-                              group={g}
-                              count={
-                                activeMemberships.filter(
-                                  (m) => m.groupId === g.id,
-                                ).length
-                              }
-                              onOpen={() => openGroup(g)}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <Empty
-                          title="İlk izleme grubunu oluşturun"
-                          action={newButton("group", "Grup oluştur")}
-                        >
-                          Sarı, turuncu, kırmızı veya kuruma özel gruplarla
-                          başlayabilirsiniz.
-                        </Empty>
-                      )}
-                    </div>
-                    <aside className="dashboard-side">
-                      <section className="panel review-panel">
-                        <div className="section-heading">
-                          <h2>Gözden geçirme</h2>
-                          <Badge tone="yellow">{dueMemberships.length}</Badge>
-                        </div>
-                        <p className="panel-sub">
-                          Tarihi gelen ve kapatılmamış incelemeler · UTC
-                        </p>
-                        {dueMemberships.length ? (
-                          <div className="review-list">
-                            {dueMemberships.slice(0, 4).map((m) => (
-                              <button
-                                key={m.id}
-                                className="review-item"
-                                onClick={() => setMemberDetail(m)}
-                              >
-                                <span className="review-dot" />
-                                <div>
-                                  <strong>
-                                    {workspace.entities.find(
-                                      (e) => e.id === m.entityId,
-                                    )?.name || "Varlık"}
-                                  </strong>
-                                  <small>
-                                    {
-                                      workspace.groups.find(
-                                        (g) => g.id === m.groupId,
-                                      )?.name
-                                    }{" "}
-                                    · {dateLabel(m.reviewOn)}
-                                  </small>
-                                  <small>Sorumlu: {m.responsible}</small>
-                                  <ReviewScheduleBadge membership={m} today={today} />
-                                </div>
-                                <ChevronRight size={16} />
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="quiet-state">
-                            <CalendarClock size={26} />
-                            <p>İşlem bekleyen inceleme bulunmuyor.</p>
-                          </div>
-                        )}
-                        {dueMemberships.length > 4 && (
-                          <p className="panel-sub">
-                            {dueMemberships.length} kaydın inceleme tarihine göre ilk 4'ü gösteriliyor.
-                          </p>
-                        )}
-                        <button
-                          className="link-btn"
-                          onClick={() => openReviewQueue()}
-                        >
-                          İş listesine git
-                          <ArrowRight size={15} />
-                        </button>
-                        <div className="inline-actions">
-                          <button className="link-btn" onClick={() => openReviewQueue("upcoming")}>
-                            Önümüzdeki 7 gün: {upcomingMemberships.length} inceleme
-                            <ArrowRight size={15} />
-                          </button>
-                        </div>
-                      </section>
-                      <section className="panel connection-panel">
-                        <Network size={27} />
-                        <h3>Kaynak ve olay çalışma alanı</h3>
-                        <p>
-                          LDAP, Palo Alto, Logsign ve Trend Micro profillerini
-                          yönetin; manuel aktarılan olayları ayrı inceleyin.
-                        </p>
-                        <Badge>Canlı toplama etkin değil</Badge>
-                        <button
-                          className="link-btn"
-                          onClick={() => navigate("sources")}
-                        >
-                          Kaynakları aç
-                          <ArrowRight size={15} />
-                        </button>
-                      </section>
-                    </aside>
-                  </div>
-                  <div className="section-heading">
-                    <h2>Varlık ve hesap ilişkileri</h2>
-                    <button
-                      className="link-btn"
-                      onClick={() => navigate("entities")}
-                    >
-                      Varlıkları aç
-                      <ArrowRight size={15} />
-                    </button>
-                  </div>
-                  {workspace.entities.length ? (
-                    <div className="entity-grid home-entities">
-                      {workspace.entities.slice(0, 3).map((e) => (
-                        <EntityCard
-                          key={e.id}
-                          entity={e}
-                          workspace={workspace}
-                          onOpen={() => setEntityDetail(e)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="panel welcome-steps">
-                      <div>
-                        <span>01</span>
-                        <strong>Varlıkları ekleyin</strong>
-                        <p>Personel, hesap ve cihazları kaydedin.</p>
-                      </div>
-                      <div>
-                        <span>02</span>
-                        <strong>İlişkileri kurun</strong>
-                        <p>Hesap ve cihazları personelle ilişkilendirin.</p>
-                      </div>
-                      <div>
-                        <span>03</span>
-                        <strong>İncelemeyi başlatın</strong>
-                        <p>Gerekçe, sorumlu ve tarihlerle gruba ekleyin.</p>
-                      </div>
-                    </div>
-                  )}
-                </>
+                <Dashboard
+                  key={`${user.id}-${demo}`}
+                  workspace={workspace}
+                  demo={demo}
+                  today={today}
+                  onNavigate={navigate}
+                  onOpenReviewQueue={openReviewQueue}
+                  onOpenActiveMemberships={() => {
+                    setMembershipFilter("active");
+                    setGroupFilter("");
+                    navigate("memberships");
+                  }}
+                  onOpenMembership={setMemberDetail}
+                  onOpenGroup={openGroup}
+                  onSessionExpired={sessionExpired}
+                  createAction={newButton}
+                />
               )}
               {page === "entities" && (
                 <>
@@ -1442,100 +1465,10 @@ export default function App() {
                   ) : membershipEmptyState()}
                 </>
               )}
-              {page === "settings" && (
-                <div className="settings-grid">
-                  <section className="panel settings-card">
-                    <Shield size={24} />
-                    <h2>XLab Vigil</h2>
-                    <p>
-                      Kurumsal varlık, ilişki, izleme grubu ve gerekçeli
-                      inceleme yönetimi.
-                    </p>
-                    <div className="settings-row">
-                      <span>Sürüm</span>
-                      <strong>{status?.version || "0.4.0"}</strong>
-                    </div>
-                    <div className="settings-row">
-                      <span>Çalışma biçimi</span>
-                      <Badge>Yerel geliştirme</Badge>
-                    </div>
-                    <div className="settings-row">
-                      <span>Canlı veri toplama</span>
-                      <Badge tone="yellow">Etkin değil</Badge>
-                    </div>
-                    <div className="settings-row">
-                      <span>Otomatik tehdit kararı</span>
-                      <strong>Uygulanmaz</strong>
-                    </div>
-                  </section>
-                  <section className="panel settings-card">
-                    <Fingerprint size={24} />
-                    <h2>Oturum ve erişim</h2>
-                    <p>
-                      Vigil kendi kullanıcıları, oturumları ve veritabanıyla
-                      ayrı çalışır.
-                    </p>
-                    <div className="settings-row">
-                      <span>Kullanıcı</span>
-                      <strong>{user.name}</strong>
-                    </div>
-                    <div className="settings-row">
-                      <span>Rol</span>
-                      <strong>{roleLabels[user.role]}</strong>
-                    </div>
-                    <div className="settings-row">
-                      <span>SSO / çok faktörlü giriş</span>
-                      <Badge tone={accountSessionStatusTone.warning}>Henüz bağlı değil</Badge>
-                    </div>
-                    <div className="settings-row">
-                      <span>Demo</span>
-                      <strong>{demo ? "Salt okunur örnek" : "Kapalı"}</strong>
-                    </div>
-                  </section>
-                  <section className="panel settings-card full-width">
-                    <Database size={24} />
-                    <h2>Ürün ve veri sınırları</h2>
-                    <p>
-                      Notlar, projeler ve şifre kasası XLab Nexus ürünündedir.
-                      Vigil bu verilere erişmez. Bu sürümde kaydedilen manuel
-                      varlıklar ve üyelikler, AD tarafından doğrulanmış kimlik
-                      veya gerçek güvenlik olayı sayılmaz.
-                    </p>
-                    <div className="scope-grid">
-                      <div>
-                        <strong>Bu sürümde</strong>
-                        <p>
-                          Varlıklar ve ilişkiler, renkli gruplar, süreli
-                          üyelikler, sürüm geçmişi, bağlantı profilleri, manuel
-                          olay aktarımı, uygulama içi bildirimler ve e-posta
-                          ayarları.
-                        </p>
-                      </div>
-                      <div>
-                        <strong>Bağlantı aşamasında</strong>
-                        <p>
-                          AD / Windows kaynakları, otomatik eşleştirme, inceleme
-                          dosyaları, kaynak sağlığı ve kurala dayalı öneriler.
-                        </p>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-              )}
             </>
           ) : (
             <Loading label="Sayfa verileri yükleniyor…" />
           )}
-          <footer className="page-footer">
-            <span>
-              XLAB VIGIL <span>Kurumsal inceleme alanı</span>
-            </span>
-            <span>
-              {demo
-                ? "Kurgusal örnek veriler"
-                : "Manuel kayıtlar · Kaynak doğrulaması bekleniyor"}
-            </span>
-          </footer>
         </main>
       </div>
       {editor && workspace && (
@@ -1579,28 +1512,57 @@ export default function App() {
           }}
         />
       )}
-      {memberDetail && workspace && (
+      {memberDetail && detailWorkspace && (
         <MembershipDetail
           key={`${demo}:${memberDetail.id}`}
           membership={memberDetail}
-          workspace={workspace}
+          workspace={detailWorkspace}
           demo={demo}
           onSessionExpired={sessionExpired}
           onMembershipChanged={membershipChanged}
           workspaceRefresh={workspaceRefresh}
-          onClose={() => setMemberDetail(null)}
+          onClose={() => { setMemberDetail(null); setMemberDetailContext(null); }}
           onEdit={
-            editable
+            editable && workspace
               ? () => {
                   setEditor({ kind: "membership", value: memberDetail });
                   setMemberDetail(null);
+                  setMemberDetailContext(null);
                 }
               : undefined
           }
         />
       )}
+      {paletteOpen && (
+        <CommandPalette
+          pages={navSections.flatMap((section) => section.pages).filter(visiblePage).map((p) => {
+            const Icon = pages[p].icon;
+            return { page: p, title: pages[p].title, icon: <Icon size={16} /> };
+          })}
+          workspace={allowed ? workspace : null}
+          searchTargets={allowed && !demo ? paletteSearchTargets.filter((target) => target.page !== "audit" || user.role === "admin") : []}
+          canCreate={{
+            entity: editable,
+            group: editable,
+            membership: editable && !!workspace?.entities.length && !!workspace?.groups.length,
+          }}
+          theme={theme.preference}
+          onClose={() => setPaletteOpen(false)}
+          onNavigate={navigate}
+          onServerSearch={(target: PaletteServerSearch, value: string) => {
+            navigate(target);
+            setQuery(value);
+          }}
+          onOpenEntity={setEntityDetail}
+          onOpenMembership={setMemberDetail}
+          onOpenGroup={openGroup}
+          onCreate={(kind) => setEditor(kind === "membership" ? { kind, groupId: groupFilter } : { kind })}
+          onOpenReviewQueue={() => openReviewQueue()}
+          onTheme={theme.choose}
+        />
+      )}
       {notice && (
-        <div className="toast" role="status">
+        <div className={`toast ${noticeTone}`} role="status">
           {notice}
         </div>
       )}
@@ -1608,32 +1570,6 @@ export default function App() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  foot,
-  icon,
-  tone = "brand",
-  onClick,
-}: {
-  label: string;
-  value: number;
-  foot: string;
-  icon: ReactNode;
-  tone?: "brand" | "red" | "yellow";
-  onClick: () => void;
-}) {
-  return (
-    <button className="stat-card" onClick={onClick}>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{foot}</small>
-      </div>
-      <span className={`stat-icon ${tone}`}>{icon}</span>
-    </button>
-  );
-}
 function GroupCard({
   group,
   count,

@@ -17,7 +17,6 @@ import {
   FormError,
   LoadError,
   Loading,
-  Modal,
   SuccessNotice,
 } from "./components";
 import { demoConnections } from "./demoFixtures";
@@ -33,6 +32,7 @@ import {
 } from "./operations";
 import type { Connection, OperationsProps } from "./operations";
 import { useAlive, useResource } from "./resource";
+import FormModal from "./FormModal";
 import { isConnectionCollection } from "./responseShape";
 
 export default function SourceManager({
@@ -352,13 +352,18 @@ function ConnectionEditor({
     }
   }
   return (
-    <Modal
+    <FormModal
       title={value ? "Bağlantı profilini düzenle" : "Bağlantı profili ekle"}
       subtitle="Yapılandırma kaydı · Canlı bağlantı veya otomatik veri alımı başlatılmaz"
-      onClose={() => {
-        if (!busy) onClose();
-      }}
+      onClose={onClose}
+      closeDisabled={busy}
+      hasUnsavedChanges={Object.entries(connectionDrafts).some(([key, draft]) => {
+        const initialDraft = key === `${initial.provider}:${initialTransport}`;
+        return draft.endpoint !== (initialDraft ? value?.endpoint || "" : "") ||
+          draft.secretRef !== (initialDraft ? value?.secretRef || "" : "");
+      })}
     >
+      {(requestClose) => (
       <form className="editor-form" onSubmit={submit}>
         <fieldset disabled={busy}>
           <label>
@@ -538,7 +543,7 @@ function ConnectionEditor({
             className="btn secondary"
             type="button"
             disabled={busy}
-            onClick={onClose}
+            onClick={requestClose}
           >
             Vazgeç
           </button>
@@ -548,6 +553,7 @@ function ConnectionEditor({
           </button>
         </div>
       </form>
-    </Modal>
+      )}
+    </FormModal>
   );
 }
