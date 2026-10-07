@@ -28,7 +28,7 @@ foreach ($script in @('common.ps1','install.ps1','start.ps1','stop.ps1','backup.
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $staging "scripts/$script")
 }
 Copy-Item -LiteralPath 'README.md','compose.yaml' -Destination $staging
-foreach ($document in @('YEREL-TESLIM.md','KULLANIM.md','YEDEKLEME.md','PILOT.md','API-CONTRACT.md','TASARIM-DILI.md','DEVIR.md','ENTEGRASYON-ARASTIRMASI.md','THIRD-PARTY-NOTICES.txt')) { Copy-Item -LiteralPath (Join-Path $projectRoot "docs/$document") -Destination (Join-Path $staging 'docs') }
+foreach ($document in @('YEREL-TESLIM.md','KULLANIM.md','YEDEKLEME.md','API-CONTRACT.md','TASARIM-DILI.md','THIRD-PARTY-NOTICES.txt')) { Copy-Item -LiteralPath (Join-Path $projectRoot "docs/$document") -Destination (Join-Path $staging 'docs') }
 $files = @(Get-ChildItem -LiteralPath $staging -Recurse -File | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = $_.FullName.Substring($staging.Length + 1).Replace('\','/'); bytes = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 })

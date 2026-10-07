@@ -56,7 +56,7 @@ Material 3'ün uyarlanabilir liste/ayrıntı düzeni ile Fluent 2'nin çekmece, 
 - Kaynak, olay ve bildirim sayfaları kendi yüklenme/hata durumlarını taşır; başarısız kaynak çağrısı varlık veya grup kayıtlarını gizlemez.
 - Bildirimler güvenlik olayı mesajlarıdır; ekip sohbeti değildir. E-posta ayarlarında gönderimin kapalı olduğu açıkça gösterilir.
 
-Kaynaklar: [Material 3](https://m3.material.io/), [Fluent 2](https://fluent2.microsoft.design/), ayrıntılı tasarım referansları [araştırma belgesinde](ENTEGRASYON-ARASTIRMASI.md).
+Kaynaklar: [Material 3](https://m3.material.io/), [Fluent 2](https://fluent2.microsoft.design/).
 
 ## 0.4 yerel kullanıcı yönetimi
 

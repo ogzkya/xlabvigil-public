@@ -88,6 +88,6 @@ Betik başarısı ve beklenen çıktı birlikte kontrol edilmelidir. Yalnız `.p
 
 ## Kabul kapsamı
 
-Kabul; ayrı sentetik PostgreSQL üzerinde şifreli yedek → yeni kopyaya geri yükleme → ürün/şema/kayıt karşılaştırması, yanlış parola, bozulmuş/kesilmiş arşiv, mevcut hedefin korunması ve legacy uyumluluğunu kapsar. Geçici açık dosyaların normal başarı ve hata yollarında temizlenmesi ayrıca gözlenir. Çalıştırılan kontroller ve sonuçları [DEVIR.md](DEVIR.md) içinde kaydedilir; burada tarif edilen davranışlar tek başına başarılı kabul kanıtı değildir.
+Kabul; ayrı sentetik PostgreSQL üzerinde şifreli yedek → yeni kopyaya geri yükleme → ürün/şema/kayıt karşılaştırması, yanlış parola, bozulmuş/kesilmiş arşiv, mevcut hedefin korunması ve legacy uyumluluğunu kapsar. Geçici açık dosyaların normal başarı ve hata yollarında temizlenmesi ayrıca gözlenir. Çalıştırılan kontroller ve sonuçları bakımcıların iç sürüm notlarında kaydedilir; burada tarif edilen davranışlar tek başına başarılı kabul kanıtı değildir.
 
 Bu akış için bağımsız kriptografi denetimi veya üretim felaket kurtarma kabulü iddiası yoktur. Otomatik saklama politikası, kurum entegrasyonları ve sunucu arızası tatbikatı ayrı kapsamdır.

@@ -2,7 +2,7 @@
 
 Vigil, insan tarafından yürütülen incelemelerin kayıtlarını ve gerekçelerini aynı yerde tutar. İki çalışma yolu vardır: varlıkları gruplarda süreli olarak takip etmek ve kaynak olaylarını bağımsız inceleme dosyalarında değerlendirmek. Bir dosya açmak için önceden varlık, grup veya üyelik oluşturmak gerekmez.
 
-Bu rehber 1.3.3 yerel ürününün kullanımını anlatır; inceleme dosyaları ve yedek akışı 1.2.0'da tamamlanmıştır. Hazır paket ayrı bir teslim dosyasıdır; çalışan eski servisin kendiliğinden güncellendiği anlamına gelmez. Tarihli yerel kabulün sonuçları [DEVIR.md](DEVIR.md), kurulum/güncelleme ayrıntıları [YEREL-TESLIM.md](YEREL-TESLIM.md) içindedir.
+Bu rehber 1.3.3 yerel ürününün kullanımını anlatır; inceleme dosyaları ve yedek akışı 1.2.0'da tamamlanmıştır. Hazır paket ayrı bir teslim dosyasıdır; çalışan eski servisin kendiliğinden güncellendiği anlamına gelmez. Tarihli yerel kabulün sonuçları bakımcıların iç sürüm notlarında, kurulum/güncelleme ayrıntıları [YEREL-TESLIM.md](YEREL-TESLIM.md) içindedir.
 
 ## 1. Kurun ve giriş yapın
 

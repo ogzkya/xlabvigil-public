@@ -50,7 +50,7 @@ pwsh -File scripts/setup.ps1
 pwsh -File scripts/start.ps1 -Background
 ```
 
-Web: http://127.0.0.1:8320. Veritabanı: 127.0.0.1:55440. İlk yönetici hesabını uygulama üzerinden siz oluşturursunuz. Ayrı pilot için `start.ps1 -Port 8330 -DatabasePort 55441` gibi farklı portlar seçilebilir; HTTP yalnız `127.0.0.1` üzerinde 1024–65535 aralığında açılır. Ayrı kurulum klasörü, benzersiz `COMPOSE_PROJECT_NAME` ve ayrı DB portu kullanımı [pilot rehberinde](docs/PILOT.md) açıklanır.
+Web: http://127.0.0.1:8320. Veritabanı: 127.0.0.1:55440. İlk yönetici hesabını uygulama üzerinden siz oluşturursunuz. Ayrı pilot için `start.ps1 -Port 8330 -DatabasePort 55441` gibi farklı portlar seçilebilir; HTTP yalnız `127.0.0.1` üzerinde 1024–65535 aralığında açılır. Ayrı pilot kurulumunda ayrı kurulum klasörü, benzersiz `COMPOSE_PROJECT_NAME` ve ayrı DB portu kullanın.
 
 Bu komutlar yeni kurulum içindir. Mevcut kurulumu aynı HTTP portu veya veritabanıyla yükseltirken eski hizmet kendi klasöründeki `stop.ps1` ile durdurulur. Bağımsız pilot ayrı HTTP/DB portları, klasör ve Compose projesi/hacmiyle eski hizmet korunarak açılabilir. Yeni paket çalışan hizmeti kendiliğinden güncellemez. Şema 11/12 için uygun eski sürümle yedek/ayrı geri dönüş doğrulaması yapılır; ana eski 0.3.0/şema 3 kurulumunun geçişi ayrı taşıma planı ve göç doğrulaması gerektirir. Ayrıntılar [yerel teslim belgesinde](docs/YEREL-TESLIM.md#güncelleme-ve-işletim) bulunur.
 
@@ -67,6 +67,5 @@ Doğrulama ve SHA-256 manifestli Windows ZIP paketi üretmek için `scripts/pack
 
 Vigil'in .env dosyası, veritabanı parolası, Compose projesi/ağı/hacmi ve vigil_session oturumu Nexus'tan ayrıdır. Nexus özel notları, kullanıcıları, oturumları veya kasa verileri buraya kopyalanmaz. Bağlantı ve bildirim formları gerçek parola/token yerine env:DEGISKEN_ADI referansı kabul eder; bu referanslar henüz çözümlenmez. Uygulama yalnızca loopback HTTP sınırında çalışır; üretim kurulumu değildir.
 
-Geliştirme: [docs/DEVIR.md](docs/DEVIR.md). Sözleşme: [docs/API-CONTRACT.md](docs/API-CONTRACT.md). Tasarım: [docs/TASARIM-DILI.md](docs/TASARIM-DILI.md).
+Sözleşme: [docs/API-CONTRACT.md](docs/API-CONTRACT.md). Tasarım: [docs/TASARIM-DILI.md](docs/TASARIM-DILI.md).
 
-Resmî üretici belgeleri, API seçenekleri ve pilot planı: [docs/ENTEGRASYON-ARASTIRMASI.md](docs/ENTEGRASYON-ARASTIRMASI.md).

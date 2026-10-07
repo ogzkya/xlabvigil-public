@@ -1,6 +1,6 @@
 # XLab Vigil local development contract
 
-Implementation agreement, started 22 September 2026; current local release 1.3.3 (4 October 2026). Go service at 127.0.0.1:8320 (test 8321), database at 55440, frontend dev 4320. Independent product `XLab Vigil`, module `xlabvigil`, cookie `vigil_session`, environment `VIGIL_*`. Existing auth endpoints /api/status, /setup, /login, /session, /logout retained. Health and status share version 1.3.3; directoryConnected=false. No records/note or records/project routes. Historical section numbers identify implementation slices, not the current release version. Current acceptance evidence is in DEVIR.md; local tests do not establish live integration or production acceptance.
+Implementation agreement, started 22 September 2026; current local release 1.3.3 (4 October 2026). Go service at 127.0.0.1:8320 (test 8321), database at 55440, frontend dev 4320. Independent product `XLab Vigil`, module `xlabvigil`, cookie `vigil_session`, environment `VIGIL_*`. Existing auth endpoints /api/status, /setup, /login, /session, /logout retained. Health and status share version 1.3.3; directoryConnected=false. No records/note or records/project routes. Historical section numbers identify implementation slices, not the current release version. Current acceptance evidence is in the maintainers' internal release notes; local tests do not establish live integration or production acceptance.
 
 All arrays return [] when empty, error on database failure. ISO timestamps and date-only YYYY-MM-DD membership dates. All mutation inputs strict JSON, same-origin, authenticated. Admin/analyst can read/write risk objects; member/viewer cannot access these sensitive objects in this slice. Admin alone reads audit. No data is seeded in the real database except the schema; demo fixtures are browser-only.
 
@@ -52,7 +52,7 @@ Evidence items add `evidence:{id,eventId,title,severity,eventOccurredAt,originPr
 
 Order is stored action time descending, then source rank and local sequence descending for equal timestamps. Membership version and evidence sequence are distinct ordered branches. Each branch contributes at most `limit+1` candidates to the bounded union; the previous membership version is joined for returned history entries. The parent check and page query share one read-only repeatable-read transaction. Separate pages are fresh reads, with no frozen multi-page snapshot, total count, or transaction commit-order guarantee. Refresh the first page to see newly visible actions. Existing `/history` and `/event-evidence` contracts remain available.
 
-Migration 10 adds membership/time/version and evidence/attachment-time/sequence indexes, plus a partial retraction-time index. It adds no event storage and does not alter historical rows. Current local runtime evidence is recorded in DEVIR.md; no production-volume acceptance is implied.
+Migration 10 adds membership/time/version and evidence/attachment-time/sequence indexes, plus a partial retraction-time index. It adds no event storage and does not alter historical rows. Current local runtime evidence is recorded in the maintainers' internal release notes; no production-volume acceptance is implied.
 
 ## 0.26 explicit membership review decisions
 
@@ -68,7 +68,7 @@ The activity endpoint exposes one `membership.reviewed` item with existing `befo
 
 Generic `PATCH /api/memberships/{id}` retains its existing status/date editing contract and emits `membership.updated`. Such an edit does not imply that a separate review decision was recorded. The review rationale requirement applies to the dedicated review endpoint.
 
-Migration 11 extends the membership history action constraint and adds `membership_reviews`, keyed by membership ID/version and linked to that exact history row. Historical rows are not backfilled as decisions. Isolated PostgreSQL migration and review tests, frontend build, and local browser acceptance are recorded in DEVIR.md.
+Migration 11 extends the membership history action constraint and adds `membership_reviews`, keyed by membership ID/version and linked to that exact history row. Historical rows are not backfilled as decisions. Isolated PostgreSQL migration and review tests, frontend build, and local browser acceptance are recorded in the maintainers' internal release notes.
 
 ## 0.27 review queue presentation and workspace refresh
 
@@ -76,7 +76,7 @@ The review queue uses the existing full `/memberships` collection; it introduces
 
 Using one browser UTC date per render, the UI classifies closed memberships first, then open memberships whose end date is before today, then overdue/today review dates, then dates from tomorrow through today+7 inclusive, and finally later dates. Scheduled open memberships can appear in the upcoming bucket. This schedule classification does not depend on the computed `active` boolean and does not modify membership state. The attention queue combines expired-open, overdue, and today; it orders by review date, end date, then membership ID. Expiry is not closure or proof that a review decision occurred.
 
-Transient workspace refresh failure retains the last snapshot only to preserve open forms. The main content shows the failure instead of current counts, and modal notices expose retry. Editor, membership decision, and event-reference writes are blocked until a full workspace refresh succeeds; their drafts remain mounted. A targeted membership GET does not certify the other workspace collections. Authentication/authorization failures clear cached workspace and dialog selections. Current frontend build and local browser evidence are recorded in DEVIR.md; those records define the observed runtime coverage.
+Transient workspace refresh failure retains the last snapshot only to preserve open forms. The main content shows the failure instead of current counts, and modal notices expose retry. Editor, membership decision, and event-reference writes are blocked until a full workspace refresh succeeds; their drafts remain mounted. A targeted membership GET does not certify the other workspace collections. Authentication/authorization failures clear cached workspace and dialog selections. Current frontend build and local browser evidence are recorded in the maintainers' internal release notes; those records define the observed runtime coverage.
 
 ## 0.28 latest explicit review context
 
@@ -124,7 +124,7 @@ The `Case` response is `{id,title,summary,responsible,status,version,createdAt,u
 
 Migration 12 adds `investigation_cases`, `case_history`, and `case_event_evidence`, with case version/history uniqueness, protected foreign-key references, case/status pagination indexes, and literal-search trigram indexing. It seeds no cases and changes no historical migration checksum. Current backup creation requires the completed 1–12 ledger; restore supports exact completed 1–11 or 1–12 archives with schema-dependent required tables and checksum matching. A restored schema-11 copy remains schema 11; restore neither upgrades it nor switches the application.
 
-Acceptance covers role rejection, strict inputs/search/cursors, immutable-create replay, expected-version races, note/close/reopen, recorded snapshots/actor names, event attach/retract, migration 11→12 preservation, encrypted schema-12 round-trip and schema-11 archive compatibility. Executed results are recorded in DEVIR.md; this contract does not mark unexecuted checks as passed or establish production/integration acceptance.
+Acceptance covers role rejection, strict inputs/search/cursors, immutable-create replay, expected-version races, note/close/reopen, recorded snapshots/actor names, event attach/retract, migration 11→12 preservation, encrypted schema-12 round-trip and schema-11 archive compatibility. Executed results are recorded in the maintainers' internal release notes; this contract does not mark unexecuted checks as passed or establish production/integration acceptance.
 
 ## 1.3 direct watchlists and prioritized membership alerts
 
@@ -173,7 +173,7 @@ The watchlist page has its own explicit apply form: editing text/type is a draft
 
 Closing a membership removes it from these open lists and alerts. A successful continue decision moves its review date and can remove `review_due`; an active red membership can still receive `red_priority`, and an upcoming date can still produce `review_upcoming`. These are current human-review work cues. The older full-collection review queue has its separate schedule presentation, including scheduled upcoming rows; it is not this endpoint's started-only alert rule.
 
-Verification should cover admin/analyst access and member/viewer rejection, strict query/cursor inputs, each search field and entity kind, Unicode/literal matching, selection echoes, full-scope counts, cross-query/type/version cursor rejection, all four date priorities and UTC boundaries, planned/expired direct-list rows, multi-membership counts, personal unread receipts, closure/continue transitions, read-only persistence, explicit failures, and unapplied-search/review draft preservation. Executed evidence belongs in DEVIR.md; this section does not mark pending checks as passed or establish live-source or production acceptance.
+Verification should cover admin/analyst access and member/viewer rejection, strict query/cursor inputs, each search field and entity kind, Unicode/literal matching, selection echoes, full-scope counts, cross-query/type/version cursor rejection, all four date priorities and UTC boundaries, planned/expired direct-list rows, multi-membership counts, personal unread receipts, closure/continue transitions, read-only persistence, explicit failures, and unapplied-search/review draft preservation. Executed evidence belongs in the maintainers' internal release notes; this section does not mark pending checks as passed or establish live-source or production acceptance.
 
 ## 1.3.2 global warning summary
 
@@ -201,7 +201,7 @@ The role-restricted header button `Uyarılar` opens the shared `Uyarı özeti` m
 
 Loading/read/shape failures never appear as a successful zero. After a refresh failure, the header replaces the numeric review count with `!`; a last valid snapshot may appear only inside the modal with its date/time and an explicit not-current message. `401`/`403`, account changes and demo/real-mode changes discard previous cached private counts. The demo summary is labelled synthetic and does not call the real endpoint. Successful-response validation checks timestamp/date consistency, all count fields and the sum before displaying a fresh number.
 
-Verification should cover strict query rejection, both allowed roles and member/viewer denial, uncapped aggregates, all date priorities, equality with an unfiltered overview, per-user unread independence, consistent read-only snapshots, dependency failure without partial counts, malformed successful responses, stale/error/auth clearing, membership/read refresh, draft preservation and the header/modal at 320px. Executed acceptance belongs in DEVIR.md; this contract does not mark pending checks as passed.
+Verification should cover strict query rejection, both allowed roles and member/viewer denial, uncapped aggregates, all date priorities, equality with an unfiltered overview, per-user unread independence, consistent read-only snapshots, dependency failure without partial counts, malformed successful responses, stale/error/auth clearing, membership/read refresh, draft preservation and the header/modal at 320px. Executed acceptance belongs in the maintainers' internal release notes; this contract does not mark pending checks as passed.
 
 ## 1.3.3 summary-to-category navigation
 
@@ -209,7 +209,7 @@ The summary's four review categories are actions that open the watchlist board w
 
 Changing alert kind within the board retains that board's applied search/entity kind and its red/yellow page positions; only warning pagination resets. These are two explicit navigation contexts. A category with zero items remains a valid empty read, not a review decision. Stale summary numbers remain labelled not-current; category navigation fetches the destination through the existing overview response validation and error/retry flow.
 
-This slice adds no URL query/deep-link contract, server data route, migration, or database write. Summary and overview JSON/query/cursor contracts, admin/analyst access, schema 12 and backup formats remain unchanged; health/status version is 1.3.3. Navigation does not mark notifications read, resolve an alert, submit a draft, or alter account access. Verification should cover every kind and `all`, repeat entry on a mounted board, draft/search/type/cursor reset, local-filter preservation, uncapped scope, empty/error/stale states and keyboard/mobile heading focus. Executed acceptance belongs in DEVIR.md; pending checks are not marked passed here.
+This slice adds no URL query/deep-link contract, server data route, migration, or database write. Summary and overview JSON/query/cursor contracts, admin/analyst access, schema 12 and backup formats remain unchanged; health/status version is 1.3.3. Navigation does not mark notifications read, resolve an alert, submit a draft, or alter account access. Verification should cover every kind and `all`, repeat entry on a mounted board, draft/search/type/cursor reset, local-filter preservation, uncapped scope, empty/error/stale states and keyboard/mobile heading focus. Executed acceptance belongs in the maintainers' internal release notes; pending checks are not marked passed here.
 
 ## 1.4.0 dashboard summary and CSV exports
 
